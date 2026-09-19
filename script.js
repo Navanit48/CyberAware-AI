@@ -4,7 +4,7 @@
    IBM SkillsBuild SkillUp Hackathon · AI for Impact Track
 
    MODULES (all in this file, load-order safe):
-     1. HF API Layer      — buildHFMessages, parseModelResponse, askIBMBob
+     1. IBM Bob API Layer — buildHFMessages, parseModelResponse, askIBMBob
      2. Dynamic Title     — TITLE_MAP, buildDynamicTitle
      3. Knowledge Base    — KNOWLEDGE_BASE, getLocalResponse, buildFallbackResponse
      4. Learn-More Links  — LEARN_MORE_MAP, getLearnMoreLinks
@@ -21,19 +21,19 @@
 'use strict';
 
 /* ════════════════════════════════════════════════════════════════════════
-   1. HUGGING FACE INFERENCE API LAYER
+   1. GOOGLE GEMINI API LAYER
    ════════════════════════════════════════════════════════════════════════
-   Uses the Hugging Face Chat Completions API (OpenAI-compatible).
-   Model: IBM Granite 3.1 8B Instruct (ibm-granite/granite-3.1-8b-instruct)
-
+   Uses the Google Gemini API (gemini-1.5-flash).
+   
    All credentials and settings live in config.js:
-     HF_API_TOKEN  — your hf_... token from huggingface.co/settings/tokens
-     HF_MODEL_ID   — the model to use
-     HF_API_URL    — derived automatically from the model ID
+     GEMINI_API_KEY  — your API key from Google AI Studio
+     GEMINI_MODEL    — e.g. 'gemini-1.5-flash'
+     GEMINI_API_URL  — derived automatically from model
 
    Flow:
      Browser → POST /api/ibm (proxy, same origin)
-             → proxy.js forwards to HF API (server-to-server, no CORS)
+             → proxy.js adds "x-goog-api-key" header
+             → proxy forwards to Gemini API
              → response parsed into ResponseData for the UI
 
    ResponseData schema:
@@ -41,43 +41,56 @@
    ════════════════════════════════════════════════════════════════════════ */
 
 /**
- * Builds the chat messages array for the HF Chat Completions API.
+ * Builds the payload for the Google Gemini API.
  * The system prompt instructs the model to return strict JSON matching
  * the ResponseData schema the UI expects (including whyItMatters field).
  * @param {string} question
- * @returns {Array<{role: string, content: string}>}
+ * @returns {object} Gemini API request body
  */
-function buildHFMessages(question) {
-  return [
-    {
-      role   : 'system',
-      content:
-        'You are CyberAware AI, an expert cybersecurity educator for complete beginners.\n' +
-        'Answer clearly, accurately, and without technical jargon.\n\n' +
-        'If the user just greets you (e.g. "hi", "hello") or asks an off-topic question:\n' +
-        '  - "title": "Hello from CyberAware AI!"\n' +
-        '  - "explanation": "Greet the user warmly and ask what cybersecurity topic they would like to learn about today."\n' +
-        '  - "whyItMatters": "Cybersecurity awareness protects you, your family, and your data from digital threats."\n' +
-        '  - "howToStaySafe": "Ask me a security question to get started!"\n' +
-        '  - "tips": ["Ask me about phishing!", "Ask me about strong passwords!", "Ask me about VPNs!"]\n' +
-        '  - "warning": ""\n\n' +
-        'IMPORTANT: You MUST respond with ONLY a valid JSON object — no markdown, no prose, no code fences.\n' +
-        'The JSON must have exactly these fields:\n' +
-        '{\n' +
-        '  "title": "Short topic title, 3-6 words, noun phrase (NOT \'What is...\' or \'How to...\')",\n' +
-        '  "explanation": "2-3 sentences explaining this to a complete beginner.",\n' +
-        '  "whyItMatters": "2-3 sentences on why this topic matters in real life and what the real-world impact is.",\n' +
-        '  "howToStaySafe": "2-3 sentences of practical, actionable defence advice.",\n' +
-        '  "tips": ["Tip 1 one sentence", "Tip 2 one sentence", "Tip 3 one sentence"],\n' +
-        '  "warning": "One critical warning sentence, OR empty string if not applicable."\n' +
-        '}\n' +
-        'Output ONLY the JSON object. Nothing else.'
+function buildGeminiPayload(question) {
+  const systemPrompt =
+    'You are CyberAware AI, an expert, adaptive cybersecurity and technology educator.\n' +
+    'Scope: You must answer ANY question that is directly, remotely, or even slightly related to cybersecurity, online privacy, computer networking, operating systems, hardware safety, scam/phishing prevention, digital forensics, cryptography, or everyday tech safety.\n\n' +
+    'RESPONSE GUIDELINES:\n' +
+    '- For simple, direct, or situational questions (e.g. "can I share my password"): The first sentence of "explanation" MUST be a direct, clear verdict (e.g., "No, you should never share your personal passwords.") followed immediately by concise practical reasoning.\n' +
+    '- For complex, conceptual, or technical questions (e.g. encryption algorithms, system architecture, protocols, vulnerability types): Provide a clear, thorough, high-level textbook explanation breaking down how it works, why it is used, and standard industry concepts.\n' +
+    '- If unsure or dealing with an edge case, NEVER say "I don\'t know" or fail silently. Provide clear, constructive, and actionable security advice related to the context.\n\n' +
+    'Only treat pure greetings (e.g. "hi", "hello") or completely unrelated non-tech queries as off-topic:\n' +
+    '  - "title": "Hello from CyberAware AI!"\n' +
+    '  - "explanation": "Greet the user warmly and invite them to ask about any security, privacy, or digital technology topic."\n' +
+    '  - "whyItMatters": "Cybersecurity awareness protects you, your data, and your systems from digital threats."\n' +
+    '  - "howToStaySafe": "Ask any security or technology question to get started!"\n' +
+    '  - "tips": ["Ask me about phishing scams!", "Ask me about securing Wi-Fi!", "Ask me how encryption works!"]\n' +
+    '  - "warning": ""\n\n' +
+    'IMPORTANT: You MUST respond with ONLY a valid JSON object — no markdown formatting, no prose outside JSON, and no code fences.\n' +
+    'The JSON must have exactly these fields:\n' +
+    '{\n' +
+    '  "title": "Short topic title, 3-6 words, noun phrase",\n' +
+    '  "explanation": "Direct verdict for simple questions, or clear high-level textbook explanation for technical/architectural topics.",\n' +
+    '  "whyItMatters": "2-3 sentences on why this topic matters in real life and what the real-world impact or risk is.",\n' +
+    '  "howToStaySafe": "2-3 sentences of practical, actionable defence advice or industry best practices.",\n' +
+    '  "tips": ["Tip 1 one sentence", "Tip 2 one sentence", "Tip 3 one sentence"],\n' +
+    '  "warning": "One critical warning sentence, pitfall to avoid, OR empty string if not applicable."\n' +
+    '}\n' +
+    'Output ONLY the JSON object. Nothing else.';
+
+  return {
+    system_instruction: {
+      parts: { text: systemPrompt }
     },
-    {
-      role   : 'user',
-      content: question
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: question }]
+      }
+    ],
+    generationConfig: {
+      maxOutputTokens: IBM_CONFIG.MAX_NEW_TOKENS,
+      temperature: IBM_CONFIG.TEMPERATURE,
+      topP: IBM_CONFIG.TOP_P,
+      responseMimeType: "application/json"
     }
-  ];
+  };
 }
 
 /**
@@ -95,7 +108,7 @@ function parseModelResponse(rawText, question) {
     .trim();
 
   const start = cleaned.indexOf('{');
-  const end   = cleaned.lastIndexOf('}');
+  const end = cleaned.lastIndexOf('}');
 
   if (start === -1 || end === -1) {
     throw new Error('Model did not return a JSON object. Raw: ' + rawText.slice(0, 200));
@@ -109,75 +122,86 @@ function parseModelResponse(rawText, question) {
   }
 
   return {
-    title        : String(parsed.title         || buildDynamicTitle(question)),
-    explanation  : String(parsed.explanation   || 'No explanation provided.'),
-    whyItMatters : String(parsed.whyItMatters  || parsed.danger || 'No danger information provided.'),
+    title: String(parsed.title || buildDynamicTitle(question)),
+    explanation: String(parsed.explanation || 'No explanation provided.'),
+    whyItMatters: String(parsed.whyItMatters || parsed.danger || 'No danger information provided.'),
     howToStaySafe: String(parsed.howToStaySafe || 'No safety advice provided.'),
-    tips         : Array.isArray(parsed.tips) && parsed.tips.length >= 3
-                     ? parsed.tips.slice(0, 3).map(String)
-                     : ['Stay informed about the latest cybersecurity threats.',
-                        'Use strong, unique passwords for every account.',
-                        'Keep all your devices and software up to date.'],
-    warning      : String(parsed.warning || '')
+    tips: Array.isArray(parsed.tips) && parsed.tips.length >= 3
+      ? parsed.tips.slice(0, 3).map(String)
+      : ['Stay informed about the latest cybersecurity threats.',
+        'Use strong, unique passwords for every account.',
+        'Keep all your devices and software up to date.'],
+    warning: String(parsed.warning || '')
   };
 }
 
 /**
  * askIBMBob — primary API entry point called by the chat UI.
+ * (Kept the original function name for compatibility)
  *
- * Guard: if HF_API_TOKEN is empty or proxy is unreachable,
- * falls back to the local knowledge base (Demo Mode).
- * Never exposes raw API errors to the user.
+ * Guard: if GEMINI_API_KEY is empty, falls back to the local knowledge
+ * base (Demo Mode). Never exposes raw API errors to the user.
  *
  * @param {string} question
  * @returns {Promise<object>} ResponseData
  */
 async function askIBMBob(question) {
-  const token = (IBM_CONFIG.HF_API_TOKEN || '').trim();
+  const apiKey = (IBM_CONFIG.GEMINI_API_KEY || '').trim();
 
-  /* ── Guard: no token — use Demo Mode knowledge base ─────────────── */
-  if (!token) {
+  /* ── Guard: no key — use Demo Mode knowledge base ─────────────── */
+  if (!apiKey) {
     return getLocalResponse(question);
   }
 
-  /* ── Build HF Chat Completions request ─────────────────────────── */
-  const hfRequestBody = {
-    model      : IBM_CONFIG.HF_MODEL_ID,
-    messages   : buildHFMessages(question),
-    max_tokens : IBM_CONFIG.MAX_NEW_TOKENS,
-    temperature: IBM_CONFIG.TEMPERATURE,
-    top_p      : IBM_CONFIG.TOP_P,
-    stream     : false
-  };
+  /* ── Build Gemini Chat Completions request ──────────────────── */
+  const geminiRequestBody = buildGeminiPayload(question);
 
-  /* ── Send via proxy (avoids CORS) — Browser → /api/ibm → proxy.js → HF API */
-  const proxyResponse = await fetch('/api/ibm', {
-    method : 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body   : JSON.stringify({
-      targetUrl  : IBM_CONFIG.HF_API_URL,
-      authHeader : `Bearer ${token}`,
-      requestBody: hfRequestBody
-    })
-  });
+  /* ── Send via proxy (avoids CORS & hides key logic) with Fallback ── */
+  const fallbackModels = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-flash-lite-latest'];
+  let proxyResponse;
+
+  for (const model of fallbackModels) {
+    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    
+    proxyResponse = await fetch('/api/ibm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey: apiKey,
+        targetUrl: targetUrl,
+        requestBody: geminiRequestBody
+      })
+    });
+
+    if (proxyResponse.ok) {
+      break; // Success!
+    }
+
+    if (proxyResponse.status === 503) {
+      console.warn(`Gemini API 503 for ${model}, trying next model...`);
+      continue;
+    }
+
+    break; // Break on 404, 429, etc., to handle them below
+  }
 
   /* ── Handle quota / rate-limit → fall back to local knowledge base */
   if (!proxyResponse.ok) {
     if (proxyResponse.status === 402 || proxyResponse.status === 429) {
-      console.warn(`HF API limit (${proxyResponse.status}) — falling back to local knowledge base.`);
+      console.warn(`Gemini API limit (${proxyResponse.status}) — falling back to local knowledge base.`);
       return getLocalResponse(question);
     }
     const errBody = await proxyResponse.text().catch(() => '');
-    throw new Error(`HF API ${proxyResponse.status}: ${errBody.slice(0, 300)}`);
+    throw new Error(`Gemini API ${proxyResponse.status}: ${errBody.slice(0, 300)}`);
   }
 
-  /* ── Parse HF Chat Completions response (OpenAI-compatible shape):
-     { "choices": [{ "message": { "role": "assistant", "content": "<JSON>" } }] } */
-  const json    = await proxyResponse.json();
-  const content = json?.choices?.[0]?.message?.content;
+  /* ── Parse Gemini API response structure:
+     { "candidates": [{ "content": { "parts": [{ "text": "<JSON>" }] } }] } */
+  const json = await proxyResponse.json();
+  const content = json?.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!content) {
-    throw new Error('Hugging Face returned an empty or unexpected response structure.');
+    throw new Error('Gemini API returned an empty or unexpected response structure.');
   }
 
   return parseModelResponse(content, question);
@@ -192,33 +216,35 @@ async function askIBMBob(question) {
 
 /** Maps keyword patterns → human-readable topic titles */
 const TITLE_MAP = [
-  { pattern: /phish/i,                                            title: 'Phishing Awareness' },
-  { pattern: /password|passphrase/i,                             title: 'Password Security' },
-  { pattern: /passkey/i,                                         title: 'Passkey Security' },
+  { pattern: /phish/i, title: 'Phishing Awareness' },
+  { pattern: /password|passphrase/i, title: 'Password Security' },
+  { pattern: /passkey/i, title: 'Passkey Security' },
   { pattern: /email\s*scam|email.*safe|safe.*email|suspicious.*email/i, title: 'Email Scam Detection' },
-  { pattern: /email/i,                                           title: 'Email Security' },
-  { pattern: /malware|virus|trojan|spyware|adware/i,             title: 'Malware Protection' },
-  { pattern: /ransomware|ransom/i,                               title: 'Ransomware Protection' },
-  { pattern: /two.factor|2fa|mfa|multi.factor|authenticat/i,    title: 'Two-Factor Authentication' },
-  { pattern: /vpn|virtual private/i,                             title: 'VPN Security' },
-  { pattern: /social engineer/i,                                 title: 'Social Engineering Awareness' },
-  { pattern: /firewall/i,                                        title: 'Firewall Protection' },
-  { pattern: /encrypt/i,                                         title: 'Encryption Basics' },
-  { pattern: /dark\s*web/i,                                      title: 'Dark Web Risks' },
-  { pattern: /wi.?fi|wireless/i,                                 title: 'Wi-Fi Security' },
-  { pattern: /hack|breach/i,                                     title: 'Cyber Attack Awareness' },
-  { pattern: /scam|fraud/i,                                      title: 'Online Scam Detection' },
-  { pattern: /privac/i,                                          title: 'Online Privacy' },
-  { pattern: /backup|back.up/i,                                  title: 'Data Backup Best Practices' },
-  { pattern: /update|patch/i,                                    title: 'Software Update Security' },
-  { pattern: /identity theft/i,                                  title: 'Identity Theft Prevention' },
-  { pattern: /cookie/i,                                          title: 'Browser Cookie Security' },
-  { pattern: /https?|ssl|tls|certificate/i,                     title: 'HTTPS & Certificate Security' },
-  { pattern: /port\s*scan|network scan/i,                       title: 'Network Scanning Awareness' },
-  { pattern: /ddos|denial.of.service/i,                         title: 'DDoS Attack Awareness' },
-  { pattern: /botnet/i,                                          title: 'Botnet Security' },
-  { pattern: /keylog/i,                                          title: 'Keylogger Threats' },
-  { pattern: /zero.day/i,                                        title: 'Zero-Day Vulnerabilities' },
+  { pattern: /email/i, title: 'Email Security' },
+  { pattern: /malware|virus|trojan|spyware|adware/i, title: 'Malware Protection' },
+  { pattern: /ransomware|ransom/i, title: 'Ransomware Protection' },
+  { pattern: /two.factor|2fa|mfa|multi.factor|authenticat/i, title: 'Two-Factor Authentication' },
+  { pattern: /vpn|virtual private/i, title: 'VPN Security' },
+  { pattern: /social engineer/i, title: 'Social Engineering Awareness' },
+  { pattern: /firewall/i, title: 'Firewall Protection' },
+  { pattern: /encrypt/i, title: 'Encryption Basics' },
+  { pattern: /dark\s*web/i, title: 'Dark Web Risks' },
+  { pattern: /wi.?fi|wireless/i, title: 'Wi-Fi Security' },
+  { pattern: /hack|breach/i, title: 'Cyber Attack Awareness' },
+  { pattern: /scam|fraud/i, title: 'Online Scam Detection' },
+  { pattern: /privac/i, title: 'Online Privacy' },
+  { pattern: /backup|back.up/i, title: 'Data Backup Best Practices' },
+  { pattern: /update|patch/i, title: 'Software Update Security' },
+  { pattern: /identity theft/i, title: 'Identity Theft Prevention' },
+  { pattern: /cookie/i, title: 'Browser Cookie Security' },
+  { pattern: /https?|ssl|tls|certificate/i, title: 'HTTPS & Certificate Security' },
+  { pattern: /port\s*scan|network scan/i, title: 'Network Scanning Awareness' },
+  { pattern: /ddos|denial.of.service/i, title: 'DDoS Attack Awareness' },
+  { pattern: /botnet/i, title: 'Botnet Security' },
+  { pattern: /keylog/i, title: 'Keylogger Threats' },
+  { pattern: /zero.day/i, title: 'Zero-Day Vulnerabilities' },
+  { pattern: /session hijack/i, title: 'Session Hijacking Awareness' },
+  { pattern: /router|wi.?fi router/i, title: 'Home Router Security' },
 ];
 
 /**
@@ -474,6 +500,38 @@ const KNOWLEDGE_BASE = [
       'Use a credit freeze — it\'s free and prevents new accounts being opened in your name.'
     ],
     warning: 'If you suspect identity theft, act immediately: freeze your credit, change passwords, and report to your country\'s cybercrime authority.'
+  },
+  {
+    keywords: ['session hijacking', 'session hijack'],
+    topicKey: 'session_hijacking',
+    titleEmoji: '🕵️',
+    explanation:
+      'Session hijacking (or cookie hijacking) occurs when an attacker steals your active session cookie or token, allowing them to impersonate you on a website without needing your username or password.',
+    whyItMatters:
+      'If an attacker hijacks your session, they have full access to your account. They can transfer funds, read private messages, or change your account details as if they were you, bypassing standard login checks.',
+    howToStaySafe:
+      'Always log out of websites when you are finished, especially on shared computers. Ensure sites you visit use HTTPS to encrypt your traffic, which protects cookies from being intercepted on public networks.',
+    tips: [
+      'Avoid performing sensitive transactions on public or unsecured Wi-Fi networks.',
+      'Clear your browser cookies periodically to remove stale session data.',
+      'Use a VPN on untrusted networks to prevent attackers from snooping on your session data.'
+    ]
+  },
+  {
+    keywords: ['router', 'home router', 'wi-fi router', 'secure router'],
+    topicKey: 'router',
+    titleEmoji: '📡',
+    explanation:
+      'Your home Wi-Fi router is the gateway between all your connected devices and the internet. Securing it prevents attackers from intercepting your traffic, stealing bandwidth, or infecting your smart devices.',
+    whyItMatters:
+      'An unsecured router can be compromised to redirect your web traffic to phishing sites or recruit your smart home devices into a botnet. Since all your data passes through the router, its security is critical to your entire home network.',
+    howToStaySafe:
+      'Change the default admin password immediately upon setup. Update the router\'s firmware regularly, and ensure your Wi-Fi network uses WPA3 (or at least WPA2) encryption with a strong, unique passphrase.',
+    tips: [
+      'Disable remote management features so your router settings cannot be accessed from the wider internet.',
+      'Set up a separate "Guest Network" for visitors and smart (IoT) devices to keep them isolated from your primary computers.',
+      'Check your router manufacturer\'s app or website occasionally for security updates.'
+    ]
   }
 ];
 
@@ -487,15 +545,15 @@ function buildFallbackResponse(question) {
   return {
     title,
     explanation:
-      `You've asked about "${question}". Cybersecurity is the practice of protecting systems, networks, and data from digital attacks and unauthorised access. While a specific knowledge base entry isn't available for this exact topic, the general principles below apply broadly.`,
+      `You asked about "${question}". While I don't have a specific pre-programmed response for that exact phrase in my local database, I can still offer constructive guidance. Cybersecurity is constantly evolving, and even edge cases share fundamental security principles.`,
     whyItMatters:
-      'Cyber threats — whether targeted attacks or opportunistic malware — can cause financial loss, identity theft, reputational damage, and privacy violations. The threat landscape evolves constantly, making awareness your most important defence.',
+      'Unexpected issues or unfamiliar terms can sometimes be warning signs of new threats. Adhering to core security practices ensures you remain protected even when facing a novel or highly specific cybersecurity situation.',
     howToStaySafe:
-      'Practice strong cyber hygiene: keep software updated, use strong unique passwords with 2FA, think critically before clicking links or opening attachments, and maintain regular data backups.',
+      'If you are unsure about a specific threat or technology, err on the side of caution. Verify any unfamiliar requests through official channels, avoid sharing sensitive information, and rely on foundational security hygiene.',
     tips: [
-      'Keep all operating systems and applications updated to eliminate known vulnerabilities.',
-      'Use a password manager and enable two-factor authentication on every important account.',
-      'Back up critical data regularly and verify your backups can actually be restored.'
+      'Keep all your systems and applications updated to patch known vulnerabilities.',
+      'Use strong, unique passwords combined with two-factor authentication (2FA).',
+      'If you suspect a security issue, disconnect from the network and seek professional IT support.'
     ]
   };
 }
@@ -509,31 +567,31 @@ function buildFallbackResponse(question) {
 
 /** @type {Record<string, Array<{label: string, url: string}>>} */
 const LEARN_MORE_MAP = {
-  phishing:          [
+  phishing: [
     { label: '🎣 Google Phishing Quiz', url: 'https://phishingquiz.withgoogle.com/' },
     { label: '📖 NCSC Guide', url: 'https://www.ncsc.gov.uk/guidance/phishing' }
   ],
-  password:          [
+  password: [
     { label: '🔐 Have I Been Pwned', url: 'https://haveibeenpwned.com/' },
     { label: '📖 Bitwarden Free', url: 'https://bitwarden.com/' }
   ],
-  email:             [
+  email: [
     { label: '📧 NCSC Email Security', url: 'https://www.ncsc.gov.uk/collection/email-security-and-anti-spoofing' },
     { label: '📖 Gmail Phishing Tips', url: 'https://support.google.com/mail/answer/8253' }
   ],
-  malware:           [
+  malware: [
     { label: '🦠 MalwareBytes Guide', url: 'https://www.malwarebytes.com/malware' },
     { label: '📖 CISA Malware Tips', url: 'https://www.cisa.gov/news-events/news/understanding-anti-virus-software' }
   ],
-  ransomware:        [
+  ransomware: [
     { label: '💰 No More Ransom', url: 'https://www.nomoreransom.org/' },
     { label: '📖 CISA Ransomware', url: 'https://www.cisa.gov/stopransomware' }
   ],
-  '2fa':             [
+  '2fa': [
     { label: '🔑 2FA Directory', url: 'https://2fa.directory/' },
     { label: '📖 Google Authenticator', url: 'https://support.google.com/accounts/answer/1066447' }
   ],
-  vpn:               [
+  vpn: [
     { label: '🌐 ProtonVPN Free', url: 'https://protonvpn.com/' },
     { label: '📖 EFF VPN Guide', url: 'https://ssd.eff.org/module/choosing-vpn-right-you' }
   ],
@@ -541,29 +599,37 @@ const LEARN_MORE_MAP = {
     { label: '🎭 SANS Social Eng.', url: 'https://www.sans.org/blog/what-is-social-engineering/' },
     { label: '📖 KnowBe4 Training', url: 'https://www.knowbe4.com/social-engineering' }
   ],
-  firewall:          [
+  firewall: [
     { label: '🧱 Microsoft Firewall', url: 'https://support.microsoft.com/en-us/windows/turn-microsoft-defender-firewall-on-or-off-ec0844f7-aebd-0583-67fe-601ecf5d774f' },
     { label: '📖 Cloudflare Firewall', url: 'https://www.cloudflare.com/learning/security/what-is-a-firewall/' }
   ],
-  encryption:        [
+  encryption: [
     { label: '🔒 EFF Encryption', url: 'https://ssd.eff.org/module/what-encryption' },
     { label: '📖 Signal App', url: 'https://signal.org/' }
   ],
-  dark_web:          [
+  dark_web: [
     { label: '🕳️ Have I Been Pwned', url: 'https://haveibeenpwned.com/' },
     { label: '📖 Dark Web Explained', url: 'https://www.kaspersky.com/resource-center/threats/deep-web' }
   ],
-  wifi:              [
+  wifi: [
     { label: '📶 Wi-Fi Security Tips', url: 'https://www.fcc.gov/consumers/guides/protecting-your-wireless-network' },
     { label: '📖 Mullvad VPN', url: 'https://mullvad.net/' }
   ],
-  backup:            [
+  backup: [
     { label: '💾 3-2-1 Backup Rule', url: 'https://www.backblaze.com/blog/the-3-2-1-backup-strategy/' },
     { label: '📖 CISA Backup Tips', url: 'https://www.cisa.gov/sites/default/files/publications/data_backup_options.pdf' }
   ],
-  identity_theft:    [
+  identity_theft: [
     { label: '🪪 IdentityTheft.gov', url: 'https://www.identitytheft.gov/' },
     { label: '📖 AnnualCreditReport', url: 'https://www.annualcreditreport.com/' }
+  ],
+  session_hijacking: [
+    { label: '🕵️ OWASP Session Hijacking', url: 'https://owasp.org/www-community/attacks/Session_hijacking_attack' },
+    { label: '📖 What is Session Hijacking?', url: 'https://www.kaspersky.com/resource-center/definitions/session-hijacking' }
+  ],
+  router: [
+    { label: '📡 CISA Securing Home Networks', url: 'https://www.cisa.gov/news-events/news/securing-your-home-network' },
+    { label: '📖 FCC Router Tips', url: 'https://www.fcc.gov/consumers/guides/how-protect-yourself-online' }
   ]
 };
 
@@ -670,7 +736,7 @@ function renderTypingIndicator() {
  * @param {string}      [topicKey] — knowledge-base topic key for learn-more links
  */
 function replaceTypingWithResponse(typingEl, question, data, topicKey) {
-  const id   = `block-${Date.now()}`;
+  const id = `block-${Date.now()}`;
   const time = getTimestamp();
 
   /* ── 3 Safety Tips ─────────────────────────────────────────────── */
@@ -692,7 +758,7 @@ function replaceTypingWithResponse(typingEl, question, data, topicKey) {
 
   /* ── Learn More pill links ──────────────────────────────────────── */
   const learnLinks = getLearnMoreLinks(topicKey);
-  const learnHtml  = learnLinks
+  const learnHtml = learnLinks
     .map(({ label, url }) =>
       `<a class="learn-more-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">
          ${escapeHtml(label)}
@@ -890,7 +956,7 @@ function setValidationMessage(message) {
  * @param {string} [message] — optional label override
  */
 function updateApiStatus(state, message) {
-  const el   = document.getElementById('apiStatus');
+  const el = document.getElementById('apiStatus');
   const text = document.getElementById('apiStatusText');
   if (!el || !text) return;
 
@@ -899,10 +965,10 @@ function updateApiStatus(state, message) {
   if (state !== 'checking') el.classList.add(`api-status--${state}`);
 
   const labels = {
-    live    : '⚡ IBM Granite AI — Live',
-    demo    : '🎭 Demo Mode Active — Local Knowledge Base',
-    offline : '📦 Offline Mode — Local Knowledge Base',
-    error   : '⚡ IBM Granite AI — Live',   // don't show errors to user; stay as live
+    live: '⚡ Google Gemini AI — Live',
+    demo: '🎭 Demo Mode Active — Local Knowledge Base',
+    offline: '📦 Offline Mode — Local Knowledge Base',
+    error: '⚡ Google Gemini AI — Live',   // don't show errors to user; stay as live
     checking: '… Checking AI connection'
   };
   text.textContent = message || labels[state] || '';
@@ -910,9 +976,9 @@ function updateApiStatus(state, message) {
 
 /* ── Initialise badge on page load based on config — no network call needed */
 (function initApiStatus() {
-  const hasToken = (IBM_CONFIG.HF_API_TOKEN || '').trim() !== '';
-  /* Show Demo Mode if no token; Live if configured */
-  updateApiStatus(hasToken ? 'live' : 'demo');
+  const hasKey = (IBM_CONFIG.GEMINI_API_KEY || '').trim() !== '';
+  /* Show Demo Mode if no key; Live if configured */
+  updateApiStatus(hasKey ? 'live' : 'demo');
 })();
 
 
@@ -922,11 +988,11 @@ function updateApiStatus(state, message) {
 
 /* Cache DOM references used repeatedly throughout the module */
 const questionInput = document.getElementById('questionInput');
-const askBtn        = document.getElementById('askBtn');
-const clearBtn      = document.getElementById('clearBtn');
-const emptyState    = document.getElementById('emptyState');
-const chatMessages  = document.getElementById('chatMessages');
-const charCount     = document.getElementById('charCount');
+const askBtn = document.getElementById('askBtn');
+const clearBtn = document.getElementById('clearBtn');
+const emptyState = document.getElementById('emptyState');
+const chatMessages = document.getElementById('chatMessages');
+const charCount = document.getElementById('charCount');
 
 /**
  * Enables or disables the Ask AI button.
@@ -1022,8 +1088,8 @@ async function handleAsk(overrideQuestion) {
   setLoading(true);
 
   /* Clear input immediately after capturing the text */
-  questionInput.value     = '';
-  charCount.textContent   = '0 / 500';
+  questionInput.value = '';
+  charCount.textContent = '0 / 500';
 
   /* ── 2. Show user bubble ──────────────────────────────────────── */
   renderUserBubble(raw);
@@ -1047,7 +1113,7 @@ async function handleAsk(overrideQuestion) {
     replaceTypingWithResponse(typingEl, raw, data, topicKey);
 
     /* Confirm live status after a successful API call */
-    if ((IBM_CONFIG.HF_API_TOKEN || '').trim()) {
+    if ((IBM_CONFIG.GEMINI_API_KEY || '').trim()) {
       updateApiStatus('live');
     }
 
@@ -1070,7 +1136,7 @@ async function handleAsk(overrideQuestion) {
    ════════════════════════════════════════════════════════════════════════ */
 
 const aboutModal = document.getElementById('aboutModal');
-const aboutBtn   = document.getElementById('aboutBtn');
+const aboutBtn = document.getElementById('aboutBtn');
 const modalClose = document.getElementById('modalClose');
 
 /**
@@ -1138,7 +1204,7 @@ questionInput.addEventListener('input', () => {
 clearBtn.addEventListener('click', () => {
   chatMessages.innerHTML = '';
   chatMessages.removeAttribute('role');
-  questionInput.value   = '';
+  questionInput.value = '';
   charCount.textContent = '0 / 500';
   setValidationMessage(null);
   if (emptyState) emptyState.style.display = '';
@@ -1150,7 +1216,7 @@ document.querySelectorAll('.suggestion-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const q = btn.dataset.q;
     /* Brief visual fill for UX, then submit immediately */
-    questionInput.value   = q;
+    questionInput.value = q;
     charCount.textContent = `${q.length} / 500`;
     handleAsk(q);
   });

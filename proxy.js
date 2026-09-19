@@ -1,14 +1,18 @@
 /**
  * CyberAware AI — proxy.js
- * Lightweight local proxy server that forwards requests to the IBM API.
+ * Lightweight local proxy server that forwards requests to Google Gemini API.
  *
  * WHY THIS EXISTS
  * ───────────────
- * Browsers block direct fetch() calls to IBM watsonx/Bob endpoints due to
- * CORS (Cross-Origin Resource Sharing). IBM's API servers do not include the
- * headers that allow browser-to-API calls. This proxy runs on your machine,
- * receives requests from the browser, adds the IBM auth header, forwards them
- * to IBM, and returns the response — bypassing the CORS restriction entirely.
+ * While Gemini sometimes supports direct browser calls, keeping the proxy
+ * hides the API key from the frontend and avoids any potential CORS issues.
+ *
+ * GEMINI AUTH
+ * ───────────
+ *   Browser → POST /api/ibm (this proxy, same origin)
+ *           → proxy adds "x-goog-api-key: <GEMINI_API_KEY>" header
+ *           → proxy forwards POST to Google Gemini API
+ *           → response returned to browser
  *
  * USAGE
  * ─────
@@ -28,8 +32,8 @@ const fs    = require('fs');
 const path  = require('path');
 const url   = require('url');
 
-const PORT     = 3000;
-const STATIC   = path.join(__dirname);   // serves index.html, style.css, script.js, config.js
+const PORT   = 3000;
+const STATIC = path.join(__dirname);   // serves index.html, style.css, script.js, config.js
 
 /* ── MIME types for static file serving ─────────────────────────────── */
 const MIME = {
@@ -44,12 +48,12 @@ const MIME = {
 function setCORSHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin',  '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-goog-api-key');
 }
 
 /* ── Forward a POST request to an upstream HTTPS URL ─────────────────── */
-/* Follows up to 3 redirects automatically (handles 301/302 from IBM).   */
-function proxyPost(targetUrl, reqBody, authHeader, res, redirectsLeft = 3) {
+/* Follows up to 3 redirects automatically.                               */
+function proxyPost(targetUrl, reqBody, apiKey, res, redirectsLeft = 3) {
   const parsed  = url.parse(targetUrl);
   const options = {
     hostname: parsed.hostname,
@@ -58,7 +62,7 @@ function proxyPost(targetUrl, reqBody, authHeader, res, redirectsLeft = 3) {
     headers : {
       'Content-Type'  : 'application/json',
       'Content-Length': Buffer.byteLength(reqBody),
-      'Authorization' : authHeader,
+      'x-goog-api-key': apiKey,  // Gemini API key header
     },
   };
 
@@ -67,13 +71,12 @@ function proxyPost(targetUrl, reqBody, authHeader, res, redirectsLeft = 3) {
     if ([301, 302, 307, 308].includes(upstreamRes.statusCode) && redirectsLeft > 0) {
       const location = upstreamRes.headers['location'];
       if (location) {
-        // Drain the redirect response body
         upstreamRes.resume();
         const nextUrl = location.startsWith('http')
           ? location
           : `https://${parsed.hostname}${location}`;
         console.log(`  ↪ Redirect ${upstreamRes.statusCode} → ${nextUrl}`);
-        return proxyPost(nextUrl, reqBody, authHeader, res, redirectsLeft - 1);
+        return proxyPost(nextUrl, reqBody, apiKey, res, redirectsLeft - 1);
       }
     }
 
@@ -131,7 +134,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  /* ── /api/ibm  — proxy endpoint ──────────────────────────────────── */
+  /* ── /api/ibm  — proxy endpoint (kept same route for simplicity) ──── */
   if (req.method === 'POST' && parsed.pathname === '/api/ibm') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
@@ -145,16 +148,17 @@ const server = http.createServer((req, res) => {
         return;
       }
 
-      const { targetUrl, authHeader, requestBody } = payload;
+      const { apiKey, targetUrl, requestBody } = payload;
 
-      if (!targetUrl || !authHeader || !requestBody) {
+      if (!apiKey || !targetUrl || !requestBody) {
         setCORSHeaders(res);
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Missing targetUrl, authHeader, or requestBody' }));
+        res.end(JSON.stringify({ error: 'Missing apiKey, targetUrl, or requestBody' }));
         return;
       }
 
-      proxyPost(targetUrl, JSON.stringify(requestBody), authHeader, res);
+      console.log(`  → Forwarding to Gemini API: ${targetUrl}`);
+      proxyPost(targetUrl, JSON.stringify(requestBody), apiKey, res);
     });
     return;
   }
@@ -166,10 +170,12 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log('');
   console.log('  ╔══════════════════════════════════════════════╗');
-  console.log('  ║   CyberAware AI — Proxy + Static Server      ║');
+  console.log('  ║   CyberAware AI — Gemini API Proxy Server    ║');
   console.log('  ╠══════════════════════════════════════════════╣');
   console.log(`  ║   Open: http://localhost:${PORT}                 ║`);
   console.log('  ║   Stop: Ctrl+C                               ║');
   console.log('  ╚══════════════════════════════════════════════╝');
+  console.log('');
+  console.log('  ℹ  Forwarding requests to Google Gemini API');
   console.log('');
 });

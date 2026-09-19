@@ -1,49 +1,37 @@
 /* ═══════════════════════════════════════════════════════════════════════
    CyberAware AI — config.js
-   AI API Configuration (Hugging Face Inference API)
+   AI API Configuration (Google Gemini API)
    ───────────────────────────────────────────────────────────────────────
-   HOW TO GET A FREE HUGGING FACE TOKEN (2 minutes, no credit card)
-   ────────────────────────────────────────────────────────────────
-   1. Go to https://huggingface.co/join  and create a free account.
-   2. Go to https://huggingface.co/settings/tokens
-   3. Click "New token" → give it any name → Role: "Read" → Generate.
-   4. Copy the token (starts with "hf_...").
-   5. Paste it into HF_API_TOKEN below and save.
-   6. Restart proxy.js and refresh the browser.
-
-   MODELS AVAILABLE (set HF_MODEL_ID below)
-   ─────────────────────────────────────────
-   IBM Granite (same family as IBM Bob):
-     "ibm-granite/granite-3.1-8b-instruct"   ← default (recommended)
-     "ibm-granite/granite-3.0-8b-instruct"
-
-   Other strong free alternatives:
-     "mistralai/Mistral-7B-Instruct-v0.3"
-     "microsoft/Phi-3-mini-4k-instruct"
-     "HuggingFaceH4/zephyr-7b-beta"
+   We are now using the Google Gemini API to power the AI!
+   
+   HOW TO GET A GEMINI API KEY (Free)
+   ──────────────────────────────────
+   1. Go to https://aistudio.google.com/app/apikey
+   2. Click "Create API Key"
+   3. Copy the key and paste it into GEMINI_API_KEY below.
 
    SECURITY NOTE
    ─────────────
-   Never commit a real token to a public Git repository.
+   Never commit your API key to a public Git repository.
    Add config.js to your .gitignore file.
    ═══════════════════════════════════════════════════════════════════════ */
 
 const IBM_CONFIG = {
 
-  /* ── Your Hugging Face API Token (required) ─────────────────────────── */
-  HF_API_TOKEN: 'hf_your_actual_token_here',     // ← Paste your hf_... token here
+  /* ── Your Google Gemini API Key (required) ──────────────────────────── */
+  GEMINI_API_KEY: 'YOUR_GEMINI_API_KEY_HERE',          // ← Paste your Gemini API key here
 
-  /* ── Model to use ───────────────────────────────────────────────────── */
-  HF_MODEL_ID: 'openai/gpt-oss-20b',
+  /* ── Model ID ───────────────────────────────────────────────────────── */
+  GEMINI_MODEL: 'gemini-3.6-flash',
 
   /* ── Generation Parameters ──────────────────────────────────────────── */
   MAX_NEW_TOKENS: 900,
   TEMPERATURE: 0.7,
   TOP_P: 0.9,
-  REPETITION_PENALTY: 1.1,
 
 };
 
-/* ── Derived URL (auto-computed) ────────────────────────────────────── */
-// HF Inference API endpoint — uses the modern v1 router
-IBM_CONFIG.HF_API_URL = 'https://router.huggingface.co/v1/chat/completions';
+/* ── Derived URL ────────────────────────────────────────────────────── */
+// Google Gemini API endpoint
+IBM_CONFIG.GEMINI_API_URL =
+  `https://generativelanguage.googleapis.com/v1beta/models/${IBM_CONFIG.GEMINI_MODEL}:generateContent`;
