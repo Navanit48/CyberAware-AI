@@ -1,70 +1,209 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Globe, ShieldAlert, ShieldCheck, AlertTriangle, Sparkles, ArrowRight } from 'lucide-react';
-import { analyzeUrl } from '../lib/url-checker';
+import { 
+  ShieldAlert, 
+  AlertTriangle, 
+  Sparkles, 
+  ArrowRight, 
+  Copy, 
+  Check, 
+  X, 
+  Layers, 
+  Server, 
+  Lock, 
+  Database,
+  Radio
+} from 'lucide-react';
+import { analyzeUrl, generateLocalUrlReport, checkThreatIntelligence, scourInternetThreats } from '../lib/url-checker';
 import { askCyberAwareAI } from '../lib/gemini';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 export default function UrlView({ onNavigateToEmail }) {
   const [urlInput, setUrlInput] = useState('');
   const [deepAnalysis, setDeepAnalysis] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [threatIntel, setThreatIntel] = useState({ found: false, databaseSize: 290676 });
+  const [liveIntel, setLiveIntel] = useState(null);
 
   const heuristic = analyzeUrl(urlInput);
+
+  // Live Threat Intelligence Database Lookup
+  useEffect(() => {
+    let isCancelled = false;
+    if (!urlInput.trim() || heuristic.isEmail) {
+      setThreatIntel({ found: false, databaseSize: 290676 });
+      setLiveIntel(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const res = await checkThreatIntelligence(urlInput);
+      if (!isCancelled && res) {
+        setThreatIntel(res);
+      }
+    }, 150);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [urlInput]);
+
+  const isDbCompromised = threatIntel.found || (liveIntel && (liveIntel.localDbMatch || liveIntel.cloudflareBlocked));
+  const effectiveScore = isDbCompromised ? 100 : (liveIntel?.threatScore ? Math.max(heuristic.score, liveIntel.threatScore) : heuristic.score);
+  const effectiveRiskLevel = isDbCompromised ? 'CRITICAL COMPROMISED' : heuristic.riskLevel;
 
   const handleDeepScan = async () => {
     if (!urlInput.trim() || isScanning) return;
     setIsScanning(true);
     setDeepAnalysis(null);
 
-    const prompt = `Perform a deep cybersecurity threat inspection on this domain/URL: "${urlInput}".
-Evaluate:
-1. Phishing & Brand Spoofing Risks
-2. SSL/TLS Certificate & Transport Security
-3. Domain Age & Registrar Anomalies
-4. Recommendation on whether users should visit or input credentials.`;
+    // 1. Live Internet Threat Scour (0 Gemini API Quota)
+    let scourData = null;
+    try {
+      scourData = await scourInternetThreats(urlInput);
+      if (scourData) {
+        setLiveIntel(scourData);
+      }
+    } catch (e) {
+      console.warn('Scour error:', e);
+    }
 
-    const res = await askCyberAwareAI(prompt);
-    setIsScanning(false);
-    if (res.success) {
-      setDeepAnalysis(res.text);
-    } else {
-      setDeepAnalysis("Unable to reach AI deep scan servers. Rely on local heuristic indicators below.");
+    const currentCompromised = (scourData && (scourData.localDbMatch || scourData.cloudflareBlocked)) || isDbCompromised;
+    const currentScore = currentCompromised ? 100 : (scourData?.threatScore ? Math.max(heuristic.score, scourData.threatScore) : effectiveScore);
+    const currentRisk = currentCompromised ? 'CRITICAL COMPROMISED' : heuristic.riskLevel;
+
+    const prompt = `Perform a comprehensive cybersecurity threat inspection on this domain/URL: "${urlInput.trim()}".
+Security Assessment Findings:
+- Calculated Threat Score: ${currentScore}/100 (${currentRisk})
+- Threat Database Blacklist Match: ${currentCompromised ? `YES (Found in active database of ${threatIntel.databaseSize?.toLocaleString()} compromised domains)` : 'No match in local blacklist'}
+- Cloudflare Security Filter: ${scourData?.cloudflareBlocked ? 'BLOCKED / MALICIOUS' : 'CLEAN / RESOLVED'}
+- Live DNS Origin: ${scourData?.googleResolved ? `Active (${scourData.resolvedIps?.join(', ')})` : 'Unresolved / Dormant'}
+- Root Domain: ${heuristic.anatomy?.rootDomain || 'N/A'}
+- Subdomains: ${heuristic.anatomy?.subdomains || 'N/A'}
+- Triggered Signals: ${heuristic.signals?.map(s => s.title).join(', ') || 'None'}
+
+Please provide a detailed, structured security intelligence breakdown:
+1. **Threat Assessment & Risk Level**
+2. **Live DNS & Security Filter Status**
+3. **Brand Spoofing & Phishing Analysis**
+4. **Transport Security & Domain Architecture**
+5. **Actionable Recommendations for the User**`;
+
+    try {
+      const res = await askCyberAwareAI(prompt);
+      setIsScanning(false);
+      if (res && res.success && res.text) {
+        setDeepAnalysis(res.text);
+      } else {
+        const fallback = generateLocalUrlReport(urlInput, {
+          ...heuristic,
+          score: currentScore,
+          riskLevel: currentRisk,
+          signals: currentCompromised
+            ? [
+                {
+                  title: `Confirmed Compromised Threat Match (${scourData?.matchedEntry || threatIntel.matchedEntry || urlInput})`,
+                  type: 'danger',
+                  desc: `Domain is actively cataloged in the global compromised database (${threatIntel.databaseSize?.toLocaleString()} active threats).`
+                },
+                ...heuristic.signals
+              ]
+            : heuristic.signals
+        }, scourData);
+        setDeepAnalysis(fallback);
+      }
+    } catch {
+      setIsScanning(false);
+      const fallback = generateLocalUrlReport(urlInput, {
+        ...heuristic,
+        score: currentScore,
+        riskLevel: currentRisk
+      }, scourData);
+      setDeepAnalysis(fallback);
     }
   };
+
+  const handleCopyReport = () => {
+    if (!deepAnalysis) return;
+    navigator.clipboard.writeText(deepAnalysis);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleClear = () => {
+    setUrlInput('');
+    setDeepAnalysis(null);
+    setLiveIntel(null);
+    setThreatIntel({ found: false, databaseSize: 290676 });
+  };
+
+  const getScoreColor = (score) => {
+    if (score >= 50) return { text: 'text-red-400', bg: 'bg-red-500', border: 'border-red-500/40' };
+    if (score >= 20) return { text: 'text-amber-400', bg: 'bg-amber-500', border: 'border-amber-500/40' };
+    return { text: 'text-emerald-accent', bg: 'bg-emerald-accent', border: 'border-emerald-accent/40' };
+  };
+
+  const scoreTheme = getScoreColor(effectiveScore);
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
       {/* Header */}
       <div className="space-y-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-dim border border-border-glow text-xs text-emerald-accent font-medium">
-          <Globe className="w-3.5 h-3.5" />
-          <span>Real-time Domain & URL Verification</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-dim border border-border-glow text-xs text-emerald-accent font-medium">
+            <Globe className="w-3.5 h-3.5" />
+            <span>Real-time Domain & URL Verification Engine</span>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-card border border-border-subtle text-xs text-subtext-muted">
+            <Database className="w-3 h-3 text-emerald-accent" />
+            <span>{(threatIntel.databaseSize || 290676).toLocaleString()} Compromised Domains Active</span>
+          </div>
         </div>
-        <h1 className="text-3xl font-extrabold text-subtext-primary tracking-tight">URL Safety Checker</h1>
+        <h1 className="text-3xl font-extrabold text-subtext-primary tracking-tight">URL Safety & Threat Scanner</h1>
         <p className="text-sm text-subtext-secondary">
-          Detect phishing links, credential harvesting scams, obfuscated URLs, and high-risk TLDs.
+          Detect phishing links, active compromised domains, deceptive subdomains, and malicious download vectors.
         </p>
       </div>
 
-      {/* URL Input Box */}
-      <div className="frosted-glass-card p-6 rounded-3xl space-y-6 border border-border-subtle shadow-glass-smooth">
+      {/* Main Scanner Container */}
+      <div className="frosted-glass-card p-6 sm:p-8 rounded-3xl space-y-6 border border-border-subtle shadow-glass-smooth">
+        {/* Input Bar */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-subtext-secondary uppercase tracking-wider">
-            Enter Domain or Web Address
+            Enter Web Address or Domain
           </label>
           <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              placeholder="e.g. https://secure-login.bank.com or my-website.org"
-              className="flex-1 bg-obsidian-subtle border border-border-subtle focus:border-emerald-accent/50 focus:ring-2 focus:ring-emerald-accent/20 rounded-2xl px-5 py-4 text-subtext-primary text-base placeholder-subtext-muted outline-none transition-all font-mono"
-            />
+            <div className="relative flex-1 flex items-center">
+              <input
+                type="text"
+                value={urlInput}
+                onChange={(e) => {
+                  setUrlInput(e.target.value);
+                  setDeepAnalysis(null);
+                }}
+                placeholder="e.g. https://secure-login.paypal.com.verify.xyz/auth or google.com"
+                className="w-full bg-obsidian-subtle border border-border-subtle focus:border-emerald-accent/50 focus:ring-2 focus:ring-emerald-accent/20 rounded-2xl px-5 py-4 text-subtext-primary text-sm sm:text-base placeholder-subtext-muted outline-none pr-12 transition-all font-mono"
+              />
+              {urlInput && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="absolute right-3.5 p-1.5 text-subtext-muted hover:text-subtext-primary hover:bg-surface-hover rounded-xl transition-all cursor-pointer"
+                  title="Clear input"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
             <button
               onClick={handleDeepScan}
-              disabled={!urlInput.trim() || isScanning}
+              disabled={!urlInput.trim() || isScanning || heuristic.isEmail}
               className={`px-6 py-4 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shrink-0 ${
-                urlInput.trim() && !isScanning
+                urlInput.trim() && !isScanning && !heuristic.isEmail
                   ? 'bg-emerald-accent text-slate-950 shadow-emerald-pill hover:bg-emerald-hover cursor-pointer'
                   : 'bg-surface-hover text-subtext-muted cursor-not-allowed'
               }`}
@@ -77,65 +216,205 @@ Evaluate:
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>AI Deep Scan</span>
+                  <span>Scan</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* Email Address Special Redirect Warning */}
+        {/* Email Address Warning Notice */}
         {heuristic.isEmail && (
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
               <div className="text-xs">
                 <p className="font-semibold text-subtext-primary">Email Address Input Detected</p>
-                <p className="text-subtext-secondary">You entered an email address instead of a web URL.</p>
+                <p className="text-subtext-secondary">You entered an email address instead of a website domain.</p>
               </div>
             </div>
             {onNavigateToEmail && (
               <button
                 onClick={onNavigateToEmail}
-                className="px-3.5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-xs font-semibold text-amber-600 dark:text-amber-300 hover:bg-amber-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-3.5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-xs font-semibold text-amber-600 dark:text-amber-300 hover:bg-amber-500/30 flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
               >
-                <span>Go to Email Scanner</span>
+                <span>Switch to Email Scanner</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
         )}
 
-        {/* Risk Level Badge */}
-        {urlInput.trim() && !heuristic.isEmail && (
-          <div className="p-5 rounded-2xl bg-surface-hover/60 border border-border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${heuristic.badgeBg} ${heuristic.badgeColor}`}>
-                  {heuristic.riskLevel}
-                </span>
-                <span className="text-xs text-subtext-muted font-mono">{heuristic.hostname}</span>
-              </div>
-              <p className="text-sm font-medium text-subtext-primary">{heuristic.summary}</p>
+        {/* Threat Intelligence Feed Critical Match Alert */}
+        {isDbCompromised && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="p-5 rounded-2xl bg-red-500/15 border border-red-500/40 text-red-400 space-y-2 shadow-lg shadow-red-500/10"
+          >
+            <div className="flex items-center gap-2.5 font-bold text-sm text-red-400">
+              <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 animate-pulse" />
+              <span>CONFIRMED COMPROMISED / BLACKLISTED DOMAIN</span>
             </div>
-            <div className="text-right shrink-0">
-              <span className="text-xs text-subtext-muted">Threat Score</span>
-              <p className="text-2xl font-bold text-subtext-primary font-mono">{heuristic.score} <span className="text-xs font-sans font-normal text-subtext-muted">/ 100</span></p>
+            <p className="text-xs text-subtext-secondary leading-relaxed">
+              This domain (<span className="font-mono font-bold text-red-400">{threatIntel.matchedEntry || urlInput}</span>) was verified and matched directly inside the active <strong className="text-red-300">Global Threat Intelligence Database ({(threatIntel.databaseSize || 290676).toLocaleString()} malicious websites)</strong>.
+            </p>
+            <div className="text-[11px] font-semibold text-red-300 flex items-center gap-1.5 pt-1">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+              <span>DO NOT VISIT, DOWNLOAD FILES, OR ENTER PASSWORDS</span>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Threat Score & Risk Badge Card */}
+        {urlInput.trim() && !heuristic.isEmail && (
+          <div className="p-6 rounded-2xl bg-surface-card border border-border-subtle space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2.5">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${isDbCompromised ? 'bg-red-500/10 border-red-500/30 text-red-400' : heuristic.badgeBg} ${isDbCompromised ? 'text-red-400' : heuristic.badgeColor}`}>
+                    {effectiveRiskLevel}
+                  </span>
+                  {heuristic.hostname && (
+                    <span className="text-xs text-subtext-muted font-mono">{heuristic.hostname}</span>
+                  )}
+                </div>
+                <p className="text-sm font-medium text-subtext-primary">
+                  {isDbCompromised 
+                    ? `CRITICAL THREAT: Verified match in Global Threat Intelligence Database (${(threatIntel.databaseSize || 290676).toLocaleString()} indexed domains).`
+                    : heuristic.summary}
+                </p>
+              </div>
+
+              <div className="text-left sm:text-right shrink-0">
+                <span className="text-xs text-subtext-muted">Calculated Threat Score</span>
+                <p className="text-3xl font-extrabold text-subtext-primary font-mono">
+                  <span className={scoreTheme.text}>{effectiveScore}</span>
+                  <span className="text-xs font-sans font-normal text-subtext-muted"> / 100</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Threat Meter Progress Bar */}
+            <div className="space-y-1">
+              <div className="w-full h-2.5 bg-obsidian-subtle rounded-full overflow-hidden p-0.5 border border-border-subtle">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.max(effectiveScore, 4)}%` }}
+                  transition={{ duration: 0.4 }}
+                  className={`h-full rounded-full ${scoreTheme.bg}`}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-subtext-muted font-mono">
+                <span>0 (Safe)</span>
+                <span>50 (Suspicious)</span>
+                <span>100 (Dangerous)</span>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Heuristic Signals List */}
+        {/* Live Security Network Verification Card */}
+        {liveIntel && (
+          <div className="p-5 rounded-2xl bg-surface-card border border-border-subtle space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-subtext-primary">
+                <Radio className="w-4 h-4 text-emerald-accent animate-pulse" />
+                <span>Live Security Network Verification</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div className="p-3 rounded-xl bg-obsidian-subtle border border-border-subtle space-y-0.5">
+                <span className="text-[10px] text-subtext-muted">Threat Database</span>
+                <p className={`font-semibold text-xs ${liveIntel.localDbMatch ? 'text-red-400' : 'text-emerald-accent'}`}>
+                  {liveIntel.localDbMatch ? 'Threat Listed' : 'Clean'}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-obsidian-subtle border border-border-subtle space-y-0.5">
+                <span className="text-[10px] text-subtext-muted">Cloudflare Security</span>
+                <p className={`font-semibold text-xs ${liveIntel.cloudflareBlocked ? 'text-red-400' : 'text-emerald-accent'}`}>
+                  {liveIntel.cloudflareBlocked ? 'Blocked' : 'Clean'}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-obsidian-subtle border border-border-subtle space-y-0.5">
+                <span className="text-[10px] text-subtext-muted">DNS Resolution</span>
+                <p className="font-semibold text-xs text-subtext-primary truncate" title={liveIntel.resolvedIps?.join(', ')}>
+                  {liveIntel.googleResolved ? `Active (${liveIntel.resolvedIps?.[0] || 'IP'})` : 'Unresolved'}
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-obsidian-subtle border border-border-subtle space-y-0.5">
+                <span className="text-[10px] text-subtext-muted">Mail Exchanger (MX)</span>
+                <p className="font-semibold text-xs text-subtext-primary">
+                  {liveIntel.hasMxRecords ? 'Configured' : 'None / Disposable'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Domain Anatomy Breakdown Grid */}
+        {urlInput.trim() && heuristic.anatomy && !heuristic.isEmail && (
+          <div className="space-y-3 pt-2 border-t border-border-subtle">
+            <div className="flex items-center gap-2 text-xs font-semibold text-subtext-secondary uppercase tracking-wider">
+              <Layers className="w-3.5 h-3.5 text-emerald-accent" />
+              <span>Domain Anatomy & Technical Architecture</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3.5 rounded-2xl bg-surface-hover/40 border border-border-subtle space-y-1">
+                <p className="text-[11px] text-subtext-muted">Root Registered Domain</p>
+                <p className="font-mono font-bold text-subtext-primary truncate">{heuristic.anatomy.rootDomain || 'N/A'}</p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-surface-hover/40 border border-border-subtle space-y-1">
+                <p className="text-[11px] text-subtext-muted">Subdomain(s)</p>
+                <p className="font-mono font-medium text-emerald-accent truncate">{heuristic.anatomy.subdomains || '(none)'}</p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-surface-hover/40 border border-border-subtle space-y-1">
+                <p className="text-[11px] text-subtext-muted">Top-Level Domain (TLD)</p>
+                <p className="font-mono font-medium text-subtext-primary">{heuristic.anatomy.tld || 'N/A'}</p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-surface-hover/40 border border-border-subtle space-y-1">
+                <p className="text-[11px] text-subtext-muted">Protocol & Transport</p>
+                <p className="font-mono font-medium text-subtext-primary flex items-center gap-1.5">
+                  <Lock className="w-3 h-3 text-emerald-accent" />
+                  <span>{heuristic.anatomy.protocol}</span>
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-surface-hover/40 border border-border-subtle space-y-1">
+                <p className="text-[11px] text-subtext-muted">Target Port</p>
+                <p className="font-mono font-medium text-subtext-primary flex items-center gap-1.5">
+                  <Server className="w-3 h-3 text-subtext-muted" />
+                  <span>{heuristic.anatomy.port}</span>
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-surface-hover/40 border border-border-subtle space-y-1">
+                <p className="text-[11px] text-subtext-muted">Path / Resource</p>
+                <p className="font-mono font-medium text-subtext-secondary truncate">{heuristic.anatomy.pathname || '/'}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Heuristic Inspection Signals */}
         {urlInput.trim() && heuristic.signals.length > 0 && !heuristic.isEmail && (
           <div className="space-y-3 pt-2 border-t border-border-subtle">
             <p className="text-xs font-semibold text-subtext-secondary uppercase tracking-wider">
-              Heuristic Inspection Signals
+              Heuristic Inspection Signals ({heuristic.signals.length})
             </p>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {heuristic.signals.map((sig, idx) => (
                 <div
                   key={idx}
-                  className={`p-4 rounded-2xl border flex items-start gap-3.5 text-xs ${
+                  className={`p-4 rounded-2xl border flex items-start gap-3.5 text-xs transition-all ${
                     sig.type === 'danger'
                       ? 'bg-red-500/10 border-red-500/30 text-red-500'
                       : sig.type === 'warning'
@@ -150,9 +429,9 @@ Evaluate:
                   ) : (
                     <ShieldCheck className="w-4 h-4 text-emerald-accent shrink-0 mt-0.5" />
                   )}
-                  <div>
+                  <div className="space-y-0.5">
                     <p className="font-semibold text-subtext-primary">{sig.title}</p>
-                    <p className="text-subtext-secondary mt-0.5">{sig.desc}</p>
+                    <p className="text-subtext-secondary leading-relaxed">{sig.desc}</p>
                   </div>
                 </div>
               ))}
@@ -160,19 +439,38 @@ Evaluate:
           </div>
         )}
 
-        {/* AI Deep Inspection Output */}
+        {/* AI Deep Inspection Intelligence Output */}
         {deepAnalysis && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-5 rounded-2xl bg-emerald-dim border border-border-glow space-y-3"
+            className="p-6 rounded-2xl bg-emerald-dim border border-border-glow space-y-4"
           >
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-accent">
-              <Sparkles className="w-4 h-4" />
-              <span>AI Security Intelligence Report</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-accent">
+                <Sparkles className="w-4 h-4" />
+                <span>AI Security Intelligence Report</span>
+              </div>
+              <button
+                onClick={handleCopyReport}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-card border border-border-subtle hover:border-emerald-accent/40 text-xs text-subtext-secondary hover:text-subtext-primary transition-all cursor-pointer"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-accent" />
+                    <span className="text-emerald-accent">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy Report</span>
+                  </>
+                )}
+              </button>
             </div>
-            <div className="text-xs text-subtext-primary leading-relaxed whitespace-pre-wrap">
-              {deepAnalysis}
+
+            <div className="pt-2 border-t border-border-glow/50">
+              <MarkdownRenderer content={deepAnalysis} />
             </div>
           </motion.div>
         )}
@@ -180,3 +478,4 @@ Evaluate:
     </div>
   );
 }
+

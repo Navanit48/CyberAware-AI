@@ -5,11 +5,15 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    watch: {
+      ignored: ['**/compromised_url.csv', '**/*.csv', '**/data/**'],
+    },
     proxy: {
-      '/api/ibm': {
+      '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
     },
   },
 });
+

@@ -83,7 +83,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen font-sans flex relative overflow-x-hidden selection:bg-emerald-accent/30 selection:text-white transition-colors duration-300 ${
+    <div className={`h-screen font-sans flex overflow-hidden selection:bg-emerald-accent/30 selection:text-white transition-colors duration-300 ${
       theme === 'dark' 
         ? 'bg-obsidian text-white bg-noise bg-grid' 
         : 'bg-slate-50 text-slate-900'
@@ -96,13 +96,13 @@ export default function App() {
       />
 
       {/* Main Workspace Container */}
-      <div className="flex-1 flex flex-col min-w-0 relative z-10">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative z-10">
         <TopBar 
           theme={theme}
           setTheme={setTheme}
         />
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto min-h-0">
           {activeTab === 'home' && (
             <HomeView 
               onSelectAction={handleSelectAction}

@@ -88,6 +88,80 @@ export default function LearnView({ onAskQuestion }) {
             </ul>
           </div>
 
+          {/* Interactive Anatomy of a Phishing Email Guide (shown for Phishing module) */}
+          {currentModule.id === 'phishing' && (
+            <div className="p-6 rounded-2xl bg-surface-card border border-border-subtle space-y-4">
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-accent uppercase tracking-wider">
+                <ShieldAlert className="w-4 h-4 text-emerald-accent" />
+                <span>Anatomy of a Fake / Phishing Email: 5 Red Flags</span>
+              </div>
+
+              <div className="space-y-3 font-mono text-xs p-4 rounded-xl bg-obsidian-subtle border border-border-subtle text-subtext-primary">
+                {/* 1. Header */}
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-red-400 font-bold uppercase">
+                    <span>1. Spoofed Sender & Lookalike Domain</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20">Red Flag</span>
+                  </div>
+                  <p className="text-subtext-secondary">
+                    From: <span className="text-red-400 font-bold">PayPal Security Team</span> &lt;admin@<span className="underline decoration-red-500">paypaI-billing-update.xyz</span>&gt;
+                  </p>
+                  <p className="text-[10px] text-subtext-muted font-sans font-normal">
+                    Display name claims a trusted brand, but domain is a lookalike with capital 'I' or foreign TLD (.xyz).
+                  </p>
+                </div>
+
+                {/* 2. Salutation */}
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-amber-400 font-bold uppercase">
+                    <span>2. Impersonal Salutation</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20">Red Flag</span>
+                  </div>
+                  <p className="text-amber-300 font-semibold">Dear Valued Customer / Dear User,</p>
+                  <p className="text-[10px] text-subtext-muted font-sans font-normal">
+                    Generic greeting used because automated attacker scripts do not know your real name.
+                  </p>
+                </div>
+
+                {/* 3. Emotional Urgency */}
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-red-400 font-bold uppercase">
+                    <span>3. Artificial Urgency & Coercion</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20">Red Flag</span>
+                  </div>
+                  <p className="text-subtext-secondary">
+                    "Your account has been temporarily locked due to failed login attempts. You must confirm your identity within <strong className="text-red-400">24 hours</strong> or access will be permanently deleted."
+                  </p>
+                </div>
+
+                {/* 4. Credential Bait */}
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-amber-400 font-bold uppercase">
+                    <span>4. Sensitive Credential Harvesting</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20">Red Flag</span>
+                  </div>
+                  <p className="text-subtext-secondary">
+                    "Please provide your <strong className="text-amber-300">ATM card PIN, SSN, and password</strong> to unlock your profile online."
+                  </p>
+                </div>
+
+                {/* 5. Masked Link Button */}
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-red-400 font-bold uppercase">
+                    <span>5. Masked Action Button & Hidden URL</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20">Red Flag</span>
+                  </div>
+                  <div className="inline-block px-4 py-2 rounded-lg bg-emerald-accent/20 border border-emerald-accent/40 text-emerald-accent font-bold cursor-pointer">
+                    [ Unlock My Account Online ]
+                  </div>
+                  <p className="text-[10px] text-subtext-muted font-sans font-normal">
+                    Hovering reveals target: <code className="text-red-400 bg-obsidian-subtle px-1 rounded">http://bit.ly/login-auth-steal</code> (diverts away from genuine paypal.com).
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2 text-xs text-subtext-secondary leading-relaxed">
             <h4 className="font-semibold text-subtext-primary text-xs">Deep Technical Context</h4>
             <p>{currentModule.data.details}</p>

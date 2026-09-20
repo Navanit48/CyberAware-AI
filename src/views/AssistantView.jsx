@@ -28,7 +28,7 @@ export default function AssistantView({
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col justify-between max-w-4xl mx-auto px-6 py-6">
+    <div className="h-full flex flex-col justify-between max-w-4xl mx-auto px-6 py-6">
       {/* Header Bar */}
       <div className="flex items-center justify-between pb-4 border-b border-border-subtle">
         <div className="flex items-center gap-3">
@@ -172,7 +172,7 @@ export default function AssistantView({
         <FloatingChat 
           onSendMessage={onSendMessage} 
           isAsking={isAsking} 
-          showSuggestions={messages.length === 0} 
+          showSuggestions={false} 
         />
       </div>
     </div>

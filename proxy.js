@@ -26,14 +26,175 @@
 
 'use strict';
 
-const http  = require('http');
-const https = require('https');
-const fs    = require('fs');
-const path  = require('path');
-const url   = require('url');
+import http from 'http';
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import url, { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT   = 3000;
-const STATIC = path.join(__dirname);   // serves index.html, style.css, script.js, config.js
+const STATIC = path.join(__dirname, 'dist');   // serves built production files or fallback
+const THREAT_DB_PATH = path.join(__dirname, 'compromised_url.csv');
+
+/* ── Global Threat Database (In-Memory Set) ─────────────────────────── */
+const compromisedDomainsSet = new Set();
+let threatCount = 0;
+
+function loadThreatDatabase() {
+  if (!fs.existsSync(THREAT_DB_PATH)) {
+    console.log('  ⚠️ Threat database not found at:', THREAT_DB_PATH);
+    return;
+  }
+  console.log('  ⏳ Loading compromised domains threat database...');
+  const startTime = Date.now();
+  try {
+    const content = fs.readFileSync(THREAT_DB_PATH, 'utf8');
+    const lines = content.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim().toLowerCase();
+      if (!line || line.startsWith('#') || line.startsWith('//')) continue;
+      // Strip protocol, trailing paths or ports
+      const clean = line.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].trim();
+      if (clean) {
+        compromisedDomainsSet.add(clean);
+      }
+    }
+    threatCount = compromisedDomainsSet.size;
+    console.log(`  🛡️ Loaded ${threatCount.toLocaleString()} compromised domains in ${Date.now() - startTime}ms`);
+  } catch (err) {
+    console.error('  ❌ Error reading threat database:', err.message);
+  }
+}
+
+// Load threat intelligence database on server init
+loadThreatDatabase();
+
+/* ── Live Internet Security & Threat Scouring Engine (0 Gemini API Quota) ── */
+async function scourInternetThreats(rawDomain) {
+  const cleanDomain = (rawDomain || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .split('/')[0]
+    .split(':')[0]
+    .trim();
+
+  if (!cleanDomain) {
+    return {
+      domain: '',
+      isCompromised: false,
+      threatScore: 0,
+      threatLevel: 'UNKNOWN',
+      scouredSources: []
+    };
+  }
+
+  // 1. Check Local 290k Blacklist
+  let localDbMatch = compromisedDomainsSet.has(cleanDomain);
+  let matchedEntry = localDbMatch ? cleanDomain : null;
+  if (!localDbMatch) {
+    const parts = cleanDomain.split('.');
+    for (let i = 1; i < parts.length - 1; i++) {
+      const parent = parts.slice(i).join('.');
+      if (compromisedDomainsSet.has(parent)) {
+        matchedEntry = parent;
+        localDbMatch = true;
+        break;
+      }
+    }
+  }
+
+  // 2. Query Cloudflare 1.1.1.2 Security DNS (DoH) and Google DNS in parallel
+  let cloudflareBlocked = false;
+  let googleResolved = false;
+  let resolvedIps = [];
+  let hasMxRecords = false;
+
+  const lookupPromises = [
+    // Cloudflare Security Malware Blocking DNS (1.1.1.2)
+    fetch(`https://security.cloudflare-dns.com/dns-query?name=${encodeURIComponent(cleanDomain)}&type=A`, {
+      headers: { 'Accept': 'application/dns-json' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.Answer) {
+          const ips = data.Answer.map(a => a.data);
+          if (ips.includes('0.0.0.0') || ips.includes('127.0.0.1')) {
+            cloudflareBlocked = true;
+          }
+        }
+      })
+      .catch(() => {}),
+
+    // Google Public DNS Resolution & IP Discovery
+    fetch(`https://dns.google/resolve?name=${encodeURIComponent(cleanDomain)}&type=A`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.Answer && data.Answer.length > 0) {
+          googleResolved = true;
+          resolvedIps = data.Answer.filter(a => a.type === 1).map(a => a.data);
+        }
+      })
+      .catch(() => {}),
+
+    // Google Public DNS Mail Exchanger (MX) Records
+    fetch(`https://dns.google/resolve?name=${encodeURIComponent(cleanDomain)}&type=MX`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.Answer && data.Answer.length > 0) {
+          hasMxRecords = true;
+        }
+      })
+      .catch(() => {})
+  ];
+
+  await Promise.allSettled(lookupPromises);
+
+  // Compute Live Threat Assessment
+  let threatLevel = 'SAFE / LOW RISK';
+  let threatScore = 0;
+  const threatSignals = [];
+
+  if (localDbMatch) {
+    threatScore = 100;
+    threatLevel = 'CRITICAL COMPROMISED';
+    threatSignals.push(`Actively cataloged in 290,676 Threat Intelligence Database (${matchedEntry})`);
+  }
+
+  if (cloudflareBlocked) {
+    threatScore = Math.max(threatScore, 95);
+    threatLevel = 'CRITICAL COMPROMISED';
+    threatSignals.push('Blocked by Cloudflare Security 1.1.1.2 Malware & Phishing Firewall');
+  }
+
+  if (googleResolved && resolvedIps.length > 0) {
+    if (resolvedIps.some(ip => ip === '0.0.0.0' || ip === '127.0.0.1')) {
+      threatScore = Math.max(threatScore, 90);
+      threatLevel = 'CRITICAL COMPROMISED';
+      threatSignals.push(`DNS points to Sinkhole / Blocked IP (${resolvedIps.join(', ')})`);
+    }
+  }
+
+  return {
+    domain: cleanDomain,
+    threatScore,
+    threatLevel,
+    isCompromised: localDbMatch || cloudflareBlocked,
+    localDbMatch,
+    matchedEntry,
+    databaseSize: threatCount,
+    cloudflareBlocked,
+    googleResolved,
+    resolvedIps,
+    hasMxRecords,
+    threatSignals,
+    scouredAt: new Date().toISOString(),
+    apiQuotaUsed: 0
+  };
+}
 
 /* ── MIME types for static file serving ─────────────────────────────── */
 const MIME = {
@@ -134,6 +295,69 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  /* ── /api/live-threat-scour — Live internet security & DNS threat lookup (0 Gemini API calls) ── */
+  if (req.method === 'GET' && parsed.pathname === '/api/live-threat-scour') {
+    setCORSHeaders(res);
+    const rawDomain = (parsed.query.domain || '').trim().toLowerCase();
+    const cleanDomain = rawDomain.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].trim();
+
+    if (!cleanDomain) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ found: false, databaseSize: threatCount, apiQuotaUsed: 0 }));
+      return;
+    }
+
+    scourInternetThreats(cleanDomain).then(result => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    }).catch(err => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message, apiQuotaUsed: 0 }));
+    });
+    return;
+  }
+
+  /* ── /api/threat-intel — check domain in 290k threat database ─────── */
+  if (req.method === 'GET' && parsed.pathname === '/api/threat-intel') {
+    setCORSHeaders(res);
+    const rawDomain = (parsed.query.domain || '').trim().toLowerCase();
+    if (!rawDomain) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ databaseSize: threatCount, found: false }));
+      return;
+    }
+
+    const cleanDomain = rawDomain.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].trim();
+    let isMatch = compromisedDomainsSet.has(cleanDomain);
+    let matchedEntry = isMatch ? cleanDomain : null;
+
+    // Suffix / parent domain match check
+    if (!isMatch) {
+      const parts = cleanDomain.split('.');
+      for (let i = 1; i < parts.length - 1; i++) {
+        const parentDomain = parts.slice(i).join('.');
+        if (compromisedDomainsSet.has(parentDomain)) {
+          matchedEntry = parentDomain;
+          isMatch = true;
+          break;
+        }
+      }
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      found: isMatch,
+      domain: cleanDomain,
+      matchedEntry: matchedEntry,
+      databaseSize: threatCount,
+      riskScore: isMatch ? 100 : null,
+      message: isMatch 
+        ? `Confirmed match in active Threat Intelligence database (${threatCount.toLocaleString()} indexed domains)`
+        : `Domain not found in active blacklist database (${threatCount.toLocaleString()} indexed domains)`
+    }));
+    return;
+  }
+
   /* ── /api/ibm  — proxy endpoint (kept same route for simplicity) ──── */
   if (req.method === 'POST' && parsed.pathname === '/api/ibm') {
     let body = '';
@@ -170,12 +394,11 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log('');
   console.log('  ╔══════════════════════════════════════════════╗');
-  console.log('  ║   CyberAware AI — Gemini API Proxy Server    ║');
+  console.log('  ║   CyberAware AI — API & Threat Intelligence  ║');
   console.log('  ╠══════════════════════════════════════════════╣');
-  console.log(`  ║   Open: http://localhost:${PORT}                 ║`);
-  console.log('  ║   Stop: Ctrl+C                               ║');
+  console.log(`  ║   Port: http://localhost:${PORT}                 ║`);
+  console.log(`  ║   Threat Intel: ${threatCount.toLocaleString()} compromised domains ║`);
   console.log('  ╚══════════════════════════════════════════════╝');
   console.log('');
-  console.log('  ℹ  Forwarding requests to Google Gemini API');
-  console.log('');
 });
+

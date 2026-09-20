@@ -63,7 +63,7 @@ export default function HomeView({ onSelectAction, onSendMessage, isAsking }) {
         <FloatingChat 
           onSendMessage={onSendMessage} 
           isAsking={isAsking} 
-          showSuggestions={true} 
+          showSuggestions={false} 
         />
         <p className="text-[11px] text-center text-subtext-muted mt-3">
           CyberAware AI can make mistakes. Always verify important security information.
