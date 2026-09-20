@@ -193,13 +193,11 @@ npm run build
 
 Developed with passion for the **IBM SkillsBuild SkillUp Hackathon**:
 
-| Member | Role |
-| :--- | :--- |
-| **Navanit Merla** | Full-Stack Architecture, Security Engines & Threat Intel |
-| **Nithin Praveen** | Frontend Architecture, UI/UX & Quiz Module |
-| **Rohan Reddy** | AI Integration, Prompt Engineering & Datasets |
-| **Akash S** | Security Testing, Header Parsing & DNS Heuristics |
-| **PJ Prem Jesuraj** | Documentation, Research Corpora & Threat Modeling |
+* **Navanit Merla**
+* **Nithin Praveen**
+* **Rohan Reddy**
+* **Akash S**
+* **PJ Prem Jesuraj**
 
 ---
 
