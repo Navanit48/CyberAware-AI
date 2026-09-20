@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-main: #080808;
+    --bg-sidebar: rgba(13, 13, 14, 0.85);
+    --bg-surface: #151515;
+    --bg-surface-hover: #1C1C1E;
+    --bg-input: #0A0A0B;
+    --border-color: #242424;
+    --border-light: rgba(255, 255, 255, 0.08);
+    
+    --text-primary: #FFFFFF;
+    --text-secondary: #9CA3AF;
+    --text-muted: #6B7280;
+    
+    --accent-emerald: #2EE6A6;
+    --accent-emerald-hover: #26C78F;
+    --accent-emerald-bg: rgba(46, 230, 166, 0.12);
+    --accent-emerald-border: rgba(46, 230, 166, 0.25);
+    --accent-emerald-text: #2EE6A6;
+
+    --shadow-smooth: 0 20px 50px rgba(0, 0, 0, 0.6);
+  }
+
+  html.light {
+    --bg-main: #F5F5F7;
+    --bg-sidebar: rgba(255, 255, 255, 0.85);
+    --bg-surface: #FFFFFF;
+    --bg-surface-hover: #F2F2F7;
+    --bg-input: #FFFFFF;
+    --border-color: #E5E5E7;
+    --border-light: rgba(0, 0, 0, 0.06);
+    
+    --text-primary: #1D1D1F;
+    --text-secondary: #6E6E73;
+    --text-muted: #86868B;
+    
+    --accent-emerald: #059669;
+    --accent-emerald-hover: #047857;
+    --accent-emerald-bg: #ECFDF5;
+    --accent-emerald-border: #A7F3D0;
+    --accent-emerald-text: #047857;
+
+    --shadow-smooth: 0 10px 30px -5px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  ::selection {
+    background-color: var(--accent-emerald-bg);
+    color: var(--accent-emerald-text);
+  }
+}
+
+/* Background noise texture */
+html.dark .bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+}
+
+/* Grid overlay */
+html.dark .bg-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+html.light .bg-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+html.dark ::-webkit-scrollbar-track {
+  background: #080808;
+}
+html.light ::-webkit-scrollbar-track {
+  background: #F5F5F7;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-emerald-text);
+}
+
+/* Theme-adaptive glassmorphism classes */
+.frosted-glass {
+  background: var(--bg-sidebar);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: var(--border-color);
+}
+
+.frosted-glass-card {
+  background: var(--bg-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-smooth);
+}

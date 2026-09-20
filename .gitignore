@@ -1,4 +1,7 @@
-config.js
 node_modules/
-.DS_Store
+dist/
+.vite/
 .env
+.env.local
+.DS_Store
+.env.*
