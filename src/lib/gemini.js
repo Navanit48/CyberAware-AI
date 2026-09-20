@@ -13,6 +13,24 @@ Guidelines:
 4. If asked about dangerous hacking attacks against innocent targets, focus on defensive countermeasures and ethical protection.
 5. Highlight critical risk warnings clearly using bold text.`;
 
+async function fetchWithRetry(url, options, retries = 4, backoff = 2000) {
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(url, options);
+    // If it's successful, or if it's an error OTHER than 429, return immediately
+    if (res.ok || res.status !== 429) {
+      return res;
+    }
+    // If it's a 429, wait and retry
+    if (i < retries - 1) {
+      console.warn(`[Rate Limit] 429 Too Many Requests. Retrying in ${backoff}ms...`);
+      await new Promise(resolve => setTimeout(resolve, backoff));
+      backoff *= 1.5; // Exponential backoff
+    } else {
+      return res; // Return the 429 if we ran out of retries
+    }
+  }
+}
+
 export async function askCyberAwareAI(question, modelOverride = GEMINI_MODEL) {
   const modelUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelOverride}:generateContent`;
 
@@ -34,7 +52,7 @@ export async function askCyberAwareAI(question, modelOverride = GEMINI_MODEL) {
 
   // 1. Try local proxy first (prevents CORS & keeps API key hidden)
   try {
-    const proxyRes = await fetch('/api/ibm', {
+    const proxyRes = await fetchWithRetry('/api/ibm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -44,7 +62,7 @@ export async function askCyberAwareAI(question, modelOverride = GEMINI_MODEL) {
       })
     });
 
-    if (proxyRes.ok) {
+    if (proxyRes && proxyRes.ok) {
       const data = await proxyRes.json();
       const text = extractGeminiText(data);
       if (text) return { success: true, text, source: 'gemini-proxy' };
@@ -55,13 +73,13 @@ export async function askCyberAwareAI(question, modelOverride = GEMINI_MODEL) {
 
   // 2. Direct API call fallback
   try {
-    const directRes = await fetch(`${modelUrl}?key=${GEMINI_API_KEY}`, {
+    const directRes = await fetchWithRetry(`${modelUrl}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    if (directRes.ok) {
+    if (directRes && directRes.ok) {
       const data = await directRes.json();
       const text = extractGeminiText(data);
       if (text) return { success: true, text, source: 'gemini-direct' };
@@ -70,7 +88,7 @@ export async function askCyberAwareAI(question, modelOverride = GEMINI_MODEL) {
     console.warn('Direct API call failed:', err);
   }
 
-  return { success: false, error: 'Could not connect to AI services.' };
+  return { success: false, error: 'Could not connect to AI services. The servers might be temporarily overloaded.' };
 }
 
 function extractGeminiText(data) {
