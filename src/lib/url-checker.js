@@ -484,43 +484,57 @@ ${redFlags}
 export function extractAiUrlVerdict(aiText) {
   if (!aiText) return null;
 
-  // Extract Threat Score (e.g. "AI Threat Score: 45" or "45 / 100")
-  const scoreMatch = aiText.match(/(?:AI Threat Score|Threat Score|Evaluated Threat Score|Calculated Threat Score)\s*:\s*(\d{1,3})/i);
-
-  // Extract Executive Summary
-  const summaryMatch = aiText.match(/(?:Executive Summary|Safety Summary|Bottom Line|Summary|Verdict Summary)\s*:\s*([^\n\r]+)/i);
-
-  // Extract Verdict
-  const verdictMatch = aiText.match(/(?:Overall Safety Verdict|Is this website safe\?|Overall Verdict|Threat Classification|Risk Rating)\s*:\s*([^\n\r.]+)/i);
-
+  // 1. Robust Score Extraction (handles markdown **bold**, `code`, [brackets], # headers, colons, slashes, etc.)
   let score = null;
+  const scoreMatch = aiText.match(/(?:ai\s*threat\s*score|threat\s*score|evaluated\s*threat\s*score|calculated\s*threat\s*score|threat\s*rating)[\s*:`#\-]*\[?(\d{1,3})/i);
   if (scoreMatch) {
-    score = Math.min(Math.max(parseInt(scoreMatch[1], 10), 0), 100);
-  } else if (verdictMatch) {
-    const v = verdictMatch[1].toLowerCase();
-    if (v.includes('danger') || v.includes('critical') || v.includes('high') || v.includes('phish') || v.includes('malicious')) score = 85;
-    else if (v.includes('caution') || v.includes('suspicious') || v.includes('moderate') || v.includes('mismatch') || v.includes('squat')) score = 45;
-    else if (v.includes('safe') || v.includes('clean') || v.includes('low')) score = 0;
+    const num = parseInt(scoreMatch[1], 10);
+    if (!isNaN(num) && num >= 0 && num <= 100) {
+      score = num;
+    }
+  }
+
+  // 2. Robust Executive Summary Extraction
+  let summary = '';
+  const summaryMatch = aiText.match(/(?:executive\s*summary|safety\s*summary|summary|bottom\s*line|direct\s*verdict)[\s*:`#\-]+([^\n\r]+)/i);
+  if (summaryMatch) {
+    summary = summaryMatch[1].replace(/^[*\s`#\-]+|[*\s`#\-]+$/g, '').trim();
+  }
+
+  // 3. Robust Safety Verdict Extraction
+  const verdictMatch = aiText.match(/(?:overall\s*safety\s*verdict|is\s*this\s*website\s*safe\??|overall\s*verdict|threat\s*classification|risk\s*rating)[\s*:`#\-?]*\**\s*([^\n\r.]+)/i);
+  const verdictText = verdictMatch ? verdictMatch[1].replace(/^[*\s`#\-]+|[*\s`#\-]+$/g, '').toLowerCase().trim() : '';
+
+  if (score === null && verdictText) {
+    if (verdictText.includes('danger') || verdictText.includes('critical') || verdictText.includes('high') || verdictText.includes('phish') || verdictText.includes('malicious')) {
+      score = 85;
+    } else if (verdictText.includes('caution') || verdictText.includes('suspicious') || verdictText.includes('moderate') || verdictText.includes('mismatch') || verdictText.includes('squat')) {
+      score = 40;
+    } else if (verdictText.includes('safe') || verdictText.includes('clean') || verdictText.includes('low')) {
+      score = 0;
+    }
   }
 
   if (score !== null) {
     let riskLevel = 'LOW RISK';
     let badgeColor = 'text-emerald-accent';
     let badgeBg = 'bg-emerald-500/10 border-emerald-500/30';
-    let summary = 'AI Security Intelligence evaluated website as safe / low risk.';
+    if (!summary) summary = 'AI Security Intelligence evaluated website as safe / low risk.';
 
     if (score >= 50) {
       riskLevel = 'HIGH RISK';
       badgeColor = 'text-red-400';
       badgeBg = 'bg-red-500/10 border-red-500/30';
-      summary = summaryMatch ? summaryMatch[1].trim() : 'AI Intelligence detected high-risk brand impersonation or malicious indicators.';
+      if (!summary || summary.startsWith('AI Security Intelligence')) {
+        summary = 'AI Intelligence detected high risk, brand impersonation, or dangerous indicators.';
+      }
     } else if (score >= 20) {
       riskLevel = 'MEDIUM RISK';
       badgeColor = 'text-amber-400';
       badgeBg = 'bg-amber-500/10 border-amber-500/30';
-      summary = summaryMatch ? summaryMatch[1].trim() : 'AI Intelligence identified potential brand mismatch, TLD confusion, or domain squatting.';
-    } else {
-      if (summaryMatch) summary = summaryMatch[1].trim();
+      if (!summary || summary.startsWith('AI Security Intelligence')) {
+        summary = 'AI Intelligence identified potential brand mismatch, TLD confusion, or domain squatting.';
+      }
     }
 
     return { score, riskLevel, badgeColor, badgeBg, summary };
