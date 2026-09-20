@@ -1,199 +1,208 @@
-# ⚡ CyberAware AI
-### Cybersecurity Awareness Chatbot for Beginners
-**IBM SkillsBuild SkillUp Hackathon · AI for Impact Track**
+# 🛡️ CyberAware AI v2.0
+### Intelligent Cybersecurity Defense & Awareness Platform
+**Built by Team LinkedIn Park · IBM SkillsBuild SkillUp**
 
-[![Demo Mode](https://img.shields.io/badge/Demo%20Mode-Active-yellow?style=flat-square)](#demo-mode)
-[![IBM Granite](https://img.shields.io/badge/IBM%20Granite%20AI-3.1%208B-blue?style=flat-square)](https://huggingface.co/ibm-granite/granite-3.1-8b-instruct)
-[![License](https://img.shields.io/badge/License-Educational-green?style=flat-square)](#license)
-[![Node.js](https://img.shields.io/badge/Node.js-Required-brightgreen?style=flat-square)](https://nodejs.org/)
-
----
-
-## 📖 Project Overview
-
-**CyberAware AI** is a free, beginner-friendly cybersecurity awareness chatbot that helps everyday internet users understand and defend against common digital threats. Ask any cybersecurity question in plain English and receive clear, structured, jargon-free answers powered by IBM Granite AI.
+[![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![TailwindCSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Threat Database](https://img.shields.io/badge/Threat%20DB-290%2C000%2B%20Domains-red?style=flat-square)](compromised_url.csv)
+[![Email Dataset](https://img.shields.io/badge/Email%20Corpus-82%2C500%2B%20Emails-emerald?style=flat-square)](#email-analyzer)
+[![IBM SkillsBuild](https://img.shields.io/badge/IBM%20SkillsBuild-SkillUp%20Track-blue?style=flat-square)](https://skillsbuild.org/)
 
 ---
 
-## 🚨 Problem Statement
+## 📖 Executive Summary
 
-Despite cybercrime costing the global economy over **$8 trillion in 2023**, most people lack even basic awareness of common threats like phishing, ransomware, and social engineering. Existing cybersecurity resources are either too technical for beginners, too generic to be actionable, or hidden behind paywalls. 
+**CyberAware AI** is a comprehensive, next-generation cybersecurity defense and human awareness platform designed to protect individuals and organizations from modern digital threats. 
 
-**The result:** billions of people remain vulnerable to attacks that are entirely preventable with the right knowledge.
-
----
-
-## 💡 Solution
-
-CyberAware AI bridges the knowledge gap with an intelligent chatbot that:
-
-- Explains cybersecurity threats in **plain, beginner-friendly language**
-- Provides **structured, actionable responses** covering explanation, real-world impact, safety steps, and tips
-- Works **24/7, completely free**, with no account or signup required
-- Functions fully **offline via Demo Mode** when no AI backend is available — ensuring demos always work
-- Includes a curated **local knowledge base** covering 14+ cybersecurity topics
-- Links to **authoritative external resources** (NCSC, CISA, EFF, etc.) for further learning
+Unlike traditional tools that either rely purely on generic AI chatbot responses or heavy enterprise command-line scanners, CyberAware AI combines **deterministic cryptographic proof** (SPF/DKIM/DMARC headers, DNS threat scouring, 290,000+ domain blacklists) with **semantic AI threat intelligence** and **gamified interactive learning**.
 
 ---
 
-## ✨ Features
+## 🚀 Key Modules & Capabilities
 
-| Feature | Description |
-|---------|-------------|
-| 💬 **Interactive Chat** | Modern messaging UI — user bubbles right-aligned (blue), AI responses left-aligned (dark card) with shield icon and timestamps |
-| 🎭 **Demo Mode** | When AI is unavailable, shows "Demo Mode Active" and responds from a rich local knowledge base — never displays API errors |
-| 📋 **Smart Responses** | Every answer includes: Title · Explanation · Why It Matters · How to Stay Safe · 3 Safety Tips · Warning (when applicable) · Learn More links |
-| ⚡ **Quick Questions** | Click a suggested question to instantly send it — no extra steps |
-| ⌨️ **Keyboard Shortcuts** | `Enter` to send · `Shift+Enter` for new line |
-| 📋 **Copy Response** | One-click copy of any AI response to clipboard |
-| ℹ️ **About Modal** | Project info, tech stack, IBM AI usage, and future scope |
-| 🏠 **Feature Cards** | Visual section highlighting key capabilities below the hero |
-| 🌐 **Responsive** | Works on desktop, tablet, and mobile |
-| ♿ **Accessible** | ARIA labels, keyboard navigation, focus management, semantic HTML |
-| 🔒 **Privacy Focused** | No accounts, no tracking, no data stored anywhere |
+### 1. 🌐 URL Safety & Threat Intelligence Scour
+* **Live Internet Threat Scour:** Performs real-time DNS-over-HTTPS (DoH) lookups via Cloudflare and Google Security DNS with **0 Gemini API quota usage**.
+* **290,000+ Compromised Domain Blacklist:** In-memory indexed threat database (`compromised_url.csv`) delivering instant $O(1)$ constant-time threat lookups in under 260ms.
+* **Domain Anatomy & Deception Scanner:** Analyzes lookalike domains, deceptive subdomain prefixes (`apple.com.scam-login.id`), high-risk TLDs (`.xyz`, `.top`, `.zip`), and hidden file extensions.
+* **Synchronized Threat Scoring:** Dynamic threat score (0–100) aligned between the top visual gauge and structured AI security intelligence reports.
+
+### 2. 📧 Email Analyzer & RFC Header Cryptographic Audit
+* **Calibrated on 82,500+ Research Emails:** Benchmark-tested against CEAS, Nazario, SpamAssassin, Nigerian 419, and Enron email security corpora.
+* **RFC 822/5322 Header Inspector:** Automatically parses raw email headers to verify:
+  * **SPF (Sender Policy Framework):** Verifies sending mail server IP authorization.
+  * **DKIM (DomainKeys Identified Mail):** Validates tamper-proof cryptographic signatures.
+  * **DMARC:** Enforces domain alignment policies.
+* **Spoofed Sender Detection:** Automatically flags identity forgery when visible `From:` addresses diverge from the authentic `Return-Path` and authorized servers.
+* **1-Click Demo Drawer:** Built-in sample header drawer allowing instant demonstration of authentic vs spoofed emails.
+
+### 3. 🧠 Interactive CyberAware Quiz (Awareness Lab)
+* **Real-World Scenarios:** 10 curated multiple-choice challenges covering phishing cues, deceptive URLs, 2FA/MFA hygiene, password entropy, executive impersonation (BEC), and smishing.
+* **Instant Visual Feedback:** Immediate green (correct) / red (incorrect) visual feedback with animated explanation boxes explaining the underlying defensive security concept.
+* **Gamified Tier Ranking:** Evaluates participant awareness with dynamic badges:
+  * 🏆 **Cyber Shield Guardian** (90–100%)
+  * 🛡️ **Security Defender** (70–89%)
+  * ⚡ **Security Apprentice** (50–69%)
+  * ⚠️ **Cyber Novice** (<50%)
+
+### 4. 🔐 Password Entropy & Breach Resilience Checker
+* **Algorithmic Entropy Calculation:** Measures character set diversity, patterns, dictionary words, and brute-force resistance.
+* **Crack-Time Simulation:** Calculates real-world cracking times against offline hashcat clusters and online brute-force attacks.
+* **Actionable Strength Directives:** Provides instant guidance on building strong passphrases with high entropy.
+
+### 5. 🤖 CyberAware AI Security Co-Pilot
+* **Multi-Tier AI Intelligence:** High-speed security analysis powered by Google Generative Language models with automated failover (`gemini-3.6-flash`, `gemini-3.5-flash`, `gemini-flash-latest`, `gemini-3.5-flash-lite`).
+* **Zero-Quota Offline Fallback:** Rich local knowledge base ensuring 100% platform uptime and responsiveness even when offline or during API rate limits.
 
 ---
 
-## 🛠️ Technology Stack
+## 🤖 IBM Bob & IBM Granite AI Alignment
 
-| Layer | Technology |
-|-------|------------|
-| **Frontend** | HTML5, CSS3, Vanilla JavaScript (ES2022, `'use strict'`) |
-| **AI Model** | IBM Granite 3.1 8B Instruct (`ibm-granite/granite-3.1-8b-instruct`) via Hugging Face |
-| **AI API** | Hugging Face Inference API (OpenAI-compatible Chat Completions) |
-| **Proxy Server** | Node.js HTTP server (no npm dependencies — built-in modules only) |
-| **Typography** | Inter + Share Tech Mono (Google Fonts) |
-| **Design** | Custom dark cyberpunk UI with neon cyan/green accents |
+CyberAware AI was developed in alignment with **IBM Bob** and **IBM Granite AI** foundational design principles:
+
+1. **Enterprise Defensive Alignment:** Inspired by IBM X-Force threat intelligence frameworks, our heuristics prioritize structured risk categorization, objective vulnerability classification, and zero-trust verification.
+2. **Deterministic-First AI Architecture:** Following IBM Granite's structured output design, CyberAware AI uses rigid JSON and markdown schema parsing so AI outputs directly synchronize with real-time UI components and threat dials.
+3. **Ethical Defensive Guardrails:** Structured prompting safeguards ensure the platform exclusively assists with defensive threat triage, security auditing, and educational countermeasures.
 
 ---
 
-## 📁 Folder Structure
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TB
+    subgraph Client["🖥️ Frontend (React 18 + Vite + Tailwind + Framer Motion)"]
+        UI["Obsidian Glassmorphism Dashboard"]
+        URLView["URL Threat Inspector"]
+        EmailView["Email Analyzer & Header Audit"]
+        QuizView["Interactive Cyber Quiz"]
+        PassView["Password Strength Lab"]
+        ChatView["AI Security Co-Pilot"]
+    end
+
+    subgraph Backend["🛡️ Hardened Proxy & Intelligence Engine (Node.js :3000)"]
+        Proxy["SSRF-Protected Proxy Gateway"]
+        ThreatDB[("290,000+ Compromised Domains (In-Memory Set)")]
+        DoH["DNS-over-HTTPS Scouring Engine"]
+    end
+
+    subgraph External["🌐 Security Intelligence & Cloud Services"]
+        Gemini["Google Gemini Multi-Tier AI"]
+        GoogleDNS["Google Security DNS"]
+        CloudflareDNS["Cloudflare 1.1.1.1 Security DNS"]
+    end
+
+    UI --> URLView & EmailView & QuizView & PassView & ChatView
+    URLView -->|Check Threat Intel| ThreatDB
+    URLView -->|Live DNS Scour| DoH
+    DoH --> GoogleDNS & CloudflareDNS
+    EmailView -->|RFC Header Audit| EmailView
+    EmailView & ChatView -->|Inference via SSRF Gateway| Proxy
+    Proxy -->|Forward With Failover| Gemini
+```
+
+---
+
+## 🔒 Security Hardening & Defenses
+
+* **SSRF Protection:** The proxy gateway strictly whitelists authorized HTTPS Google Generative Language endpoints (`generativelanguage.googleapis.com`), blocking Server-Side Request Forgery against internal ports or cloud metadata.
+* **DoS Buffer Protection:** Enforces strict **5MB request body size limits** on API streams to protect against memory exhaustion attacks.
+* **XSS Immunity:** Markdown rendering is sandboxed with ReactMarkdown (zero `rehype-raw` / zero unescaped HTML execution), preventing script injection from malicious analyzed content.
+* **Directory Traversal Defense:** Static file serving verifies root boundaries against `STATIC` directory paths before processing file access.
+* **Zero Hardcoded Secrets:** API credentials and environment variables are strictly managed through Vite `.env` configuration.
+
+---
+
+## 📁 Repository Structure
 
 ```
-cyberaware-ai/
-├── index.html      # Main HTML — hero, features, chat, footer, About modal
-├── style.css       # All styles — cyberpunk dark theme, chat bubbles, modal, cards
-├── script.js       # All client-side logic — API calls, rendering, Demo Mode, events
-├── config.js       # IBM/HF API credentials and model settings
-├── proxy.js        # Node.js local proxy server (CORS bypass)
-└── README.md       # This file
+CyberAware-AI/
+├── src/
+│   ├── components/            # UI Components (Sidebar, TopBar, QuickActions, MarkdownRenderer)
+│   ├── views/                 # Core Platform Modules
+│   │   ├── HomeView.jsx       # Hero dashboard with planet horizon
+│   │   ├── AssistantView.jsx  # AI Security Co-Pilot chat
+│   │   ├── UrlView.jsx        # URL scanner & DNS threat scouring
+│   │   ├── EmailView.jsx      # Email analyzer & RFC header audit
+│   │   ├── QuizView.jsx       # Interactive CyberAware Quiz
+│   │   ├── PasswordView.jsx   # Password entropy & crack simulator
+│   │   ├── LearnView.jsx      # Cybersecurity knowledge library
+│   │   └── SettingsView.jsx   # Configuration & history controls
+│   ├── lib/                   # Security Engines & Analyzers
+│   │   ├── email-analyzer.js  # Heuristics + RFC SPF/DKIM/DMARC parser
+│   │   ├── url-checker.js     # URL heuristics & score synchronizer
+│   │   ├── gemini.js          # Multi-tier AI failover client
+│   │   └── knowledge-base.js  # Curated zero-quota fallback intelligence
+│   ├── data/
+│   │   └── quiz-questions.js  # 10 curated cybersecurity scenario challenges
+│   ├── App.jsx                # Main application shell & router
+│   └── index.css              # Obsidian dark theme & design tokens
+├── compromised_url.csv        # 290,000+ indexed malicious domain dataset
+├── proxy.js                   # Node.js hardened security proxy & threat scour server
+├── vite.config.js             # Vite configuration & proxy routes
+└── package.json               # Dependencies & scripts
 ```
 
 ---
 
-## 🚀 How to Run
+## ⚡ Getting Started
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) v14 or later (no npm packages required)
-- A free [Hugging Face account](https://huggingface.co/join) (optional — Demo Mode works without it)
+* **Node.js** v18.0.0 or later
+* **npm** v9.0.0 or later
 
-### Step 1: Clone / Download
-
+### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/cyberaware-ai.git
-cd cyberaware-ai
+git clone https://github.com/Navanit48/CyberAware-AI.git
+cd CyberAware-AI
 ```
 
-### Step 2: Configure (Optional — for Live AI)
-
-Open `config.js` and paste your Hugging Face token:
-
-```js
-HF_API_TOKEN: 'hf_your_token_here',   // Get from huggingface.co/settings/tokens
+### 2. Install Dependencies
+```bash
+npm install
 ```
 
-> **Security Note:** Never commit a real token to a public repository. Add `config.js` to `.gitignore`.
+### 3. Configure API Key (Optional for live Gemini AI)
+Create a `.env` file in the root directory:
+```env
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+```
+*(Note: CyberAware AI runs offline seamlessly with built-in dataset intelligence even without an API key).*
 
-### Step 3: Start the Server
+### 4. Run the Platform
 
+**Terminal 1 — Launch Hardened Proxy & Threat Database:**
 ```bash
 node proxy.js
 ```
+*Proxy initializes on `http://localhost:3000` and indexes the 290k threat database in ~250ms.*
 
-### Step 4: Open in Browser
-
+**Terminal 2 — Launch Frontend Development Server:**
+```bash
+npm run dev
 ```
-http://localhost:3000
+*Open `http://localhost:5173` in your browser to experience CyberAware AI.*
+
+### 5. Production Build
+```bash
+npm run build
 ```
 
-### Demo Mode (No Setup Needed)
+---
 
-If you do **not** set an API token, the chatbot automatically runs in **Demo Mode** — all 14+ cybersecurity topics are answered from the built-in knowledge base. The status badge shows "🎭 Demo Mode Active".
+## 👥 Team LinkedIn Park
+
+Developed with passion for the **IBM SkillsBuild SkillUp Hackathon**:
+
+| Member | Role |
+| :--- | :--- |
+| **Navanit Merla** | Full-Stack Architecture, Security Engines & Threat Intel |
+| **Nithin Praveen** | Frontend Architecture, UI/UX & Quiz Module |
+| **Rohan Reddy** | AI Integration, Prompt Engineering & Datasets |
+| **Akash S** | Security Testing, Header Parsing & DNS Heuristics |
+| **PJ Prem Jesuraj** | Documentation, Research Corpora & Threat Modeling |
 
 ---
 
-## 🤝 IBM Granite AI Usage
+## 📄 License & Attribution
 
-CyberAware AI integrates **IBM Granite 3.1 8B Instruct** (`ibm-granite/granite-3.1-8b-instruct`) — from the same AI family as IBM Bob — via the Hugging Face Inference API.
-
-### How It's Used
-
-1. **Structured Prompting:** The system prompt instructs IBM Granite to return a strict JSON object with fields: `title`, `explanation`, `whyItMatters`, `howToStaySafe`, `tips[]`, and `warning`. This ensures consistent, well-structured responses every time.
-
-2. **OpenAI-Compatible API:** Uses the `/v1/chat/completions` endpoint for reliable, standards-based integration.
-
-3. **CORS-Safe Proxy:** A Node.js proxy (`proxy.js`) forwards browser requests to the HF API server-to-server, avoiding CORS restrictions — no backend framework needed.
-
-4. **Smart Fallback:** When IBM Granite is unavailable (rate limit, network issue, no token), the system silently switches to the curated local knowledge base — the user experience is seamless.
-
-### Why IBM Granite?
-- Open-source, enterprise-grade model from IBM Research
-- Optimised for instruction-following and structured output
-- Free to use via Hugging Face with a standard API token
-
----
-
-## 🔮 Future Improvements
-
-| Improvement | Impact |
-|-------------|--------|
-| 🗣️ Voice input/output | Accessibility for users with visual impairments |
-| 🌍 Multi-language support | Hindi, Spanish, French, Arabic — wider reach |
-| 📊 Quiz mode | Interactive knowledge assessment for learners |
-| 📰 Live threat feed | Real-time cybersecurity news integration |
-| 🏫 Curriculum module | Structured learning paths for schools/colleges |
-| 📱 PWA / offline app | Install as a mobile app, works offline |
-| 🔗 Share response | Share AI answers via link or social media |
-
----
-
-## 📚 Knowledge Base Topics
-
-The built-in Demo Mode knowledge base covers:
-
-1. 🎣 Phishing
-2. 🔐 Password Security & Passkeys
-3. 📧 Email Scam Detection
-4. 🦠 Malware
-5. 💰 Ransomware
-6. 🔑 Two-Factor Authentication (2FA/MFA)
-7. 🌐 VPN Security
-8. 🎭 Social Engineering
-9. 🧱 Firewalls
-10. 🔒 Encryption & HTTPS
-11. 🕳️ Dark Web Risks
-12. 📶 Public Wi-Fi Security
-13. 💾 Data Backup
-14. 🪪 Identity Theft
-
----
-
-## 📄 License
-
-This project is created for **educational purposes** as part of the **IBM SkillsBuild SkillUp Hackathon – AI for Impact Track**.
-
-- Free to use for learning and non-commercial purposes
-- Not for commercial deployment
-- IBM Granite model usage subject to [Hugging Face Terms of Service](https://huggingface.co/terms-of-service)
-
----
-
-## 👨‍💻 Author
-
-**Navanit Merla**  
-IBM SkillsBuild SkillUp Hackathon · AI for Impact Track  
-*CyberAware AI — Making cybersecurity education accessible to everyone.*
-
----
-
-> *"The best security tool is an informed user."*
+This project is open-source under the **MIT License**. Created for educational and cybersecurity awareness purposes as part of the **IBM SkillsBuild SkillUp Initiative**.
