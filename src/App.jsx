@@ -13,7 +13,6 @@ import { getLocalFallback } from './lib/knowledge-base';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
-  const [selectedModel, setSelectedModel] = useState('gemini-3.6-flash');
   const [theme, setTheme] = useState('dark');
   const [messages, setMessages] = useState([]);
   const [isAsking, setIsAsking] = useState(false);
@@ -48,8 +47,8 @@ export default function App() {
       setActiveTab('assistant');
     }
 
-    // Call Gemini API with selected model
-    const response = await askCyberAwareAI(text.trim(), selectedModel);
+    // Call AI intelligence engine
+    const response = await askCyberAwareAI(text.trim());
     setIsAsking(false);
 
     let aiText = '';
@@ -99,8 +98,6 @@ export default function App() {
       {/* Main Workspace Container */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         <TopBar 
-          selectedModel={selectedModel} 
-          setSelectedModel={setSelectedModel} 
           theme={theme}
           setTheme={setTheme}
         />
@@ -137,8 +134,6 @@ export default function App() {
 
           {activeTab === 'settings' && (
             <SettingsView 
-              selectedModel={selectedModel}
-              setSelectedModel={setSelectedModel}
               onClearHistory={handleClearMessages}
             />
           )}

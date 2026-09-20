@@ -70,7 +70,7 @@ export async function askCyberAwareAI(question, modelOverride = GEMINI_MODEL) {
     console.warn('Direct API call failed:', err);
   }
 
-  return { success: false, error: 'Could not connect to Gemini AI services.' };
+  return { success: false, error: 'Could not connect to AI services.' };
 }
 
 function extractGeminiText(data) {

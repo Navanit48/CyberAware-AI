@@ -37,7 +37,7 @@ export default function AssistantView({
           </div>
           <div>
             <h2 className="text-base font-semibold text-subtext-primary">AI Security Assistant</h2>
-            <p className="text-xs text-subtext-muted">Powered by Gemini AI Engine</p>
+            <p className="text-xs text-subtext-muted">CyberAware Intelligence Engine</p>
           </div>
         </div>
 

@@ -169,7 +169,7 @@ Evaluate:
           >
             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-accent">
               <Sparkles className="w-4 h-4" />
-              <span>Gemini AI Intelligence Report</span>
+              <span>AI Security Intelligence Report</span>
             </div>
             <div className="text-xs text-subtext-primary leading-relaxed whitespace-pre-wrap">
               {deepAnalysis}
