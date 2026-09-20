@@ -1,8 +1,15 @@
 /* ── Gemini API Client & Proxy Handler ─────────────────────────────────── */
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-3.5-flash';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+// Array of models to try in order of preference. If one hits a rate limit, it falls back to the next.
+const FALLBACK_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+  'gemini-1.5-flash',
+  'gemini-2.5-pro',
+  'gemini-1.5-pro'
+];
 
 const SYSTEM_INSTRUCTION = `You are CyberAware AI, an elite cybersecurity intelligence assistant built with Apple and Linear design philosophies.
 Your mission is to keep users safe from cyber threats, phishing, malware, password breaches, and network vulnerabilities.
@@ -13,7 +20,8 @@ Guidelines:
 4. If asked about dangerous hacking attacks against innocent targets, focus on defensive countermeasures and ethical protection.
 5. Highlight critical risk warnings clearly using bold text.`;
 
-async function fetchWithRetry(url, options, retries = 4, backoff = 2000) {
+async function fetchWithRetry(url, options, retries = 2, backoff = 1000) {
+  // Reduced retries and backoff to fail faster and switch models quicker
   const retryableStatuses = [429, 503];
   for (let i = 0; i < retries; i++) {
     const res = await fetch(url, options);
@@ -27,13 +35,13 @@ async function fetchWithRetry(url, options, retries = 4, backoff = 2000) {
       await new Promise(resolve => setTimeout(resolve, backoff));
       backoff *= 1.5; // Exponential backoff
     } else {
-      return res; // Return the 429 if we ran out of retries
+      return res; // Return the 429/503 if we ran out of retries
     }
   }
 }
 
-export async function askCyberAwareAI(question, modelOverride = GEMINI_MODEL) {
-  const modelUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelOverride}:generateContent`;
+export async function askCyberAwareAI(question, modelOverride = null) {
+  const modelsToTry = modelOverride ? [modelOverride] : FALLBACK_MODELS;
 
   const payload = {
     contents: [
@@ -51,45 +59,59 @@ export async function askCyberAwareAI(question, modelOverride = GEMINI_MODEL) {
     }
   };
 
-  // 1. Try local proxy first (prevents CORS & keeps API key hidden)
-  try {
-    const proxyRes = await fetchWithRetry('/api/ibm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        apiKey: GEMINI_API_KEY,
-        targetUrl: modelUrl,
-        requestBody: payload
-      })
-    });
+  for (const model of modelsToTry) {
+    const modelUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    console.log(`[AI] Attempting inference with model: ${model}`);
 
-    if (proxyRes && proxyRes.ok) {
-      const data = await proxyRes.json();
-      const text = extractGeminiText(data);
-      if (text) return { success: true, text, source: 'gemini-proxy' };
+    // 1. Try local proxy first (prevents CORS & keeps API key hidden)
+    try {
+      const proxyRes = await fetchWithRetry('/api/ibm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey: GEMINI_API_KEY,
+          targetUrl: modelUrl,
+          requestBody: payload
+        })
+      });
+
+      if (proxyRes && proxyRes.ok) {
+        const data = await proxyRes.json();
+        const text = extractGeminiText(data);
+        if (text) return { success: true, text, source: 'gemini-proxy', modelUsed: model };
+      }
+      
+      // If the proxy fails but NOT because it's offline (500), it's a real API failure (e.g. 429 limit).
+      // In this case, skip the direct fallback and move to the NEXT model.
+      if (proxyRes && proxyRes.status !== 500 && proxyRes.status !== 502 && proxyRes.status !== 504) {
+        console.warn(`[AI] Proxy returned ${proxyRes.status} for ${model}. Switching to next model...`);
+        continue; 
+      }
+    } catch (err) {
+      // Network error hitting the proxy, continue to direct fallback
     }
-  } catch (err) {
-    console.warn('Proxy fetch failed, falling back to direct API fetch:', err);
+
+    // 2. Direct API call fallback (if proxy is offline)
+    try {
+      const directRes = await fetchWithRetry(`${modelUrl}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (directRes && directRes.ok) {
+        const data = await directRes.json();
+        const text = extractGeminiText(data);
+        if (text) return { success: true, text, source: 'gemini-direct', modelUsed: model };
+      } else {
+         console.warn(`[AI] Direct call returned ${directRes?.status} for ${model}. Switching to next model...`);
+      }
+    } catch (err) {
+      console.warn(`[AI] Direct API call failed for ${model}:`, err);
+    }
   }
 
-  // 2. Direct API call fallback
-  try {
-    const directRes = await fetchWithRetry(`${modelUrl}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (directRes && directRes.ok) {
-      const data = await directRes.json();
-      const text = extractGeminiText(data);
-      if (text) return { success: true, text, source: 'gemini-direct' };
-    }
-  } catch (err) {
-    console.warn('Direct API call failed:', err);
-  }
-
-  return { success: false, error: 'Could not connect to AI services. The servers might be temporarily overloaded.' };
+  return { success: false, error: 'All AI models are currently overloaded. Please try again in a few minutes.' };
 }
 
 function extractGeminiText(data) {
