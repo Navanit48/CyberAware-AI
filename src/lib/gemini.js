@@ -46,7 +46,7 @@ export async function askCyberAwareAI(question, modelOverride = GEMINI_MODEL) {
     generationConfig: {
       temperature: 0.7,
       topP: 0.9,
-      maxOutputTokens: 1000
+      maxOutputTokens: 4096
     }
   };
 
