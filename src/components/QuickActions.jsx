@@ -1,11 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Globe, Mail, ShieldAlert, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Globe, Mail, BrainCircuit, ShieldAlert, ChevronRight } from 'lucide-react';
 
 const ACTIONS = [
   { id: 'password', label: 'Check Password', icon: ShieldCheck },
   { id: 'url', label: 'Analyze Website', icon: Globe },
   { id: 'email', label: 'Scan Email', icon: Mail },
+  { id: 'quiz', label: 'Cyber Quiz', icon: BrainCircuit },
   { id: 'learn', label: 'Learn Phishing', icon: ShieldAlert },
 ];
 

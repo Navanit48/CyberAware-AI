@@ -358,11 +358,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  /* ── /api/ibm  — proxy endpoint (kept same route for simplicity) ──── */
+  /* ── /api/ibm  — proxy endpoint (with SSRF protection & payload limit) ──── */
   if (req.method === 'POST' && parsed.pathname === '/api/ibm') {
     let body = '';
-    req.on('data', chunk => { body += chunk; });
+    const MAX_PAYLOAD_SIZE = 5 * 1024 * 1024; // 5 MB max payload
+
+    req.on('data', chunk => { 
+      body += chunk; 
+      if (body.length > MAX_PAYLOAD_SIZE) {
+        setCORSHeaders(res);
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Payload too large (5MB max)' }));
+        req.destroy();
+      }
+    });
+
     req.on('end', () => {
+      if (body.length > MAX_PAYLOAD_SIZE) return;
+
       let payload;
       try { payload = JSON.parse(body); }
       catch {
@@ -378,6 +391,25 @@ const server = http.createServer((req, res) => {
         setCORSHeaders(res);
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Missing apiKey, targetUrl, or requestBody' }));
+        return;
+      }
+
+      // Security: SSRF Protection — Only allow requests to authorized Google Gemini API domains
+      try {
+        const parsedTarget = new URL(targetUrl);
+        const allowedHosts = ['generativelanguage.googleapis.com', 'googleapis.com'];
+        const isAllowed = allowedHosts.some(host => parsedTarget.hostname === host || parsedTarget.hostname.endsWith(`.${host}`));
+        
+        if (parsedTarget.protocol !== 'https:' || !isAllowed) {
+          setCORSHeaders(res);
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Forbidden: targetUrl must be an authorized HTTPS Google Generative Language endpoint' }));
+          return;
+        }
+      } catch {
+        setCORSHeaders(res);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid targetUrl format' }));
         return;
       }
 

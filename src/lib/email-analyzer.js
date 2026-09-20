@@ -84,6 +84,186 @@ const DANGEROUS_ATTACHMENT_REGEXES = [
 // 11. Free-Mail Spoofing (Corporate/Security claims coming from public webmail)
 const FREE_MAIL_PROVIDERS = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'proton.me', 'icloud.com'];
 
+/**
+ * Parses raw RFC 822 / 5322 email headers to extract SPF, DKIM, DMARC authentication records
+ */
+export function parseEmailHeaders(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  // Check if text looks like it contains email headers
+  const hasHeaderSignatures = 
+    /(?:from\s*:|received-spf\s*:|authentication-results\s*:|dkim-signature\s*:|return-path\s*:|received\s*:|arc-authentication-results\s*:|message-id\s*:)/i.test(text);
+
+  if (!hasHeaderSignatures) return null;
+
+  // Extract From header
+  let fromName = '';
+  let fromEmail = '';
+  let fromDomain = '';
+  const fromMatch = text.match(/from\s*:\s*(?:["']?([^<>\n\r]+)["']?\s*)?(?:<([^>\n\r]+)>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))/i);
+  if (fromMatch) {
+    fromName = (fromMatch[1] || '').trim();
+    fromEmail = (fromMatch[2] || fromMatch[3] || '').trim().toLowerCase();
+    if (fromEmail.includes('@')) {
+      fromDomain = fromEmail.split('@')[1].toLowerCase().trim();
+    }
+  }
+
+  // Extract Return-Path
+  let returnPath = '';
+  let returnDomain = '';
+  const returnPathMatch = text.match(/return-path\s*:\s*<([^>\n\r]+)>/i);
+  if (returnPathMatch) {
+    returnPath = returnPathMatch[1].trim().toLowerCase();
+    if (returnPath.includes('@')) {
+      returnDomain = returnPath.split('@')[1].toLowerCase().trim();
+    }
+  }
+
+  // Extract Reply-To
+  let replyTo = '';
+  let replyDomain = '';
+  const replyToMatch = text.match(/reply-to\s*:\s*(?:<([^>\n\r]+)>|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))/i);
+  if (replyToMatch) {
+    replyTo = (replyToMatch[1] || replyToMatch[2] || '').trim().toLowerCase();
+    if (replyTo.includes('@')) {
+      replyDomain = replyTo.split('@')[1].toLowerCase().trim();
+    }
+  }
+
+  // Extract Subject
+  let subject = '';
+  const subjectMatch = text.match(/subject\s*:\s*([^\n\r]+)/i);
+  if (subjectMatch) {
+    subject = subjectMatch[1].trim();
+  }
+
+  // Extract Client IP if present
+  let clientIp = '';
+  const ipMatch = text.match(/(?:client-ip|ip|sender\s*ip)[\s=:]+([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/i) ||
+                  text.match(/received-spf:\s*(?:pass|fail|softfail|neutral)\s*\([^)]*?([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})/i);
+  if (ipMatch) {
+    clientIp = ipMatch[1];
+  }
+
+  // Extract SPF
+  let spfStatus = 'NONE';
+  let spfDetails = 'No SPF record or verification header detected';
+
+  const receivedSpfMatch = text.match(/received-spf\s*:\s*(pass|fail|softfail|neutral|none|permerror|temperror)\b([^\n\r;]*)/i);
+  const authResultsSpfMatch = text.match(/spf\s*=\s*(pass|fail|softfail|neutral|none|permerror|temperror)\b([^\n\r;]*)/i);
+
+  if (receivedSpfMatch || authResultsSpfMatch) {
+    const rawStatus = (receivedSpfMatch ? receivedSpfMatch[1] : authResultsSpfMatch[1]).toUpperCase();
+    const rawDetails = (receivedSpfMatch ? receivedSpfMatch[2] : authResultsSpfMatch[2] || '').trim();
+    spfStatus = rawStatus;
+    if (rawStatus === 'PASS') {
+      spfDetails = clientIp ? `IP (${clientIp}) authorized by domain policy` : 'Sending server IP is authorized by domain SPF record';
+    } else if (rawStatus === 'FAIL') {
+      spfDetails = clientIp ? `IP (${clientIp}) is NOT authorized to send mail for @${fromDomain || 'domain'}` : 'Sending IP failed domain authorization';
+    } else if (rawStatus === 'SOFTFAIL') {
+      spfDetails = 'IP not recognized; domain owner discourages acceptance (~all)';
+    } else if (rawStatus === 'NEUTRAL') {
+      spfDetails = 'Domain makes no assertion on sending IP (?all)';
+    } else {
+      spfDetails = rawDetails || 'No explicit SPF evaluation result';
+    }
+  }
+
+  // Extract DKIM
+  let dkimStatus = 'NONE';
+  let dkimDomain = '';
+  let dkimDetails = 'No DKIM signature found in headers';
+
+  const dkimSigMatch = text.match(/dkim-signature\s*:\s*([^;]+;(?:\s*[^;\n\r]+;)*)/i) || text.match(/dkim-signature\s*:\s*([^\n\r]+)/i);
+  const dkimDomainMatch = text.match(/d\s*=\s*([a-zA-Z0-9.-]+)/i);
+  if (dkimDomainMatch) {
+    dkimDomain = dkimDomainMatch[1].toLowerCase().trim();
+  }
+
+  const authResultsDkimMatch = text.match(/dkim\s*=\s*(pass|fail|none|neutral|temperror|permerror)\b([^\n\r;]*)/i);
+  if (authResultsDkimMatch) {
+    const rawStatus = authResultsDkimMatch[1].toUpperCase();
+    dkimStatus = rawStatus;
+    if (rawStatus === 'PASS') {
+      dkimDetails = dkimDomain ? `Valid cryptographic signature from ${dkimDomain}` : 'Cryptographic signature is valid and intact';
+    } else if (rawStatus === 'FAIL') {
+      dkimDetails = 'Cryptographic signature verification failed or message was modified';
+    } else {
+      dkimDetails = 'No valid DKIM signature evaluated';
+    }
+  } else if (dkimSigMatch) {
+    dkimStatus = 'PASS';
+    dkimDetails = dkimDomain ? `Signed by ${dkimDomain} (signature present in header)` : 'DKIM cryptographic signature present';
+  }
+
+  // Extract DMARC
+  let dmarcStatus = 'NONE';
+  let dmarcPolicy = '';
+  let dmarcDetails = 'No DMARC policy header found';
+
+  const authResultsDmarcMatch = text.match(/dmarc\s*=\s*(pass|fail|none|action\s*=\s*\w+)\b([^\n\r;]*)/i);
+  const dmarcPolicyMatch = text.match(/p\s*=\s*(reject|quarantine|none)/i);
+  if (dmarcPolicyMatch) {
+    dmarcPolicy = dmarcPolicyMatch[1].toUpperCase();
+  }
+
+  if (authResultsDmarcMatch) {
+    const rawStatus = authResultsDmarcMatch[1].toUpperCase();
+    if (rawStatus.includes('PASS')) {
+      dmarcStatus = 'PASS';
+      dmarcDetails = dmarcPolicy ? `DMARC policy (${dmarcPolicy}) aligned and enforced` : 'SPF/DKIM aligned with sender domain';
+    } else if (rawStatus.includes('FAIL')) {
+      dmarcStatus = 'FAIL';
+      dmarcDetails = dmarcPolicy ? `Failed DMARC policy (${dmarcPolicy})` : 'SPF/DKIM unaligned with sender domain';
+    } else {
+      dmarcStatus = 'NONE';
+      dmarcDetails = 'No DMARC policy published by sender domain';
+    }
+  } else if (spfStatus === 'PASS' && (dkimStatus === 'PASS' || dkimDomain === fromDomain)) {
+    dmarcStatus = 'PASS';
+    dmarcDetails = 'SPF and DKIM pass with domain alignment';
+  } else if (spfStatus === 'FAIL' || dkimStatus === 'FAIL') {
+    dmarcStatus = 'FAIL';
+    dmarcDetails = 'Authentication failed; domain alignment broken';
+  }
+
+  // Domain Mismatch & Spoofing Evaluation
+  const isDomainMismatch = fromDomain && returnDomain && (fromDomain !== returnDomain) && !returnDomain.endsWith(`.${fromDomain}`);
+  const isReplyMismatch = fromDomain && replyDomain && (fromDomain !== replyDomain) && !replyDomain.endsWith(`.${fromDomain}`);
+  
+  let verdict = 'UNVERIFIED';
+  let verdictDescription = '';
+
+  if (spfStatus === 'FAIL' || dkimStatus === 'FAIL' || dmarcStatus === 'FAIL') {
+    verdict = 'SPOOFED';
+    verdictDescription = `SPOOFED SENDER: Email claims to be from ${fromDomain || fromEmail || 'sender'}, but failed cryptographic server authentication (SPF/DKIM/DMARC).`;
+  } else if (isDomainMismatch && spfStatus !== 'PASS') {
+    verdict = 'SUSPICIOUS';
+    verdictDescription = `Sender header (@${fromDomain}) does not match server return-path (@${returnDomain}).`;
+  } else if (spfStatus === 'PASS' && (dkimStatus === 'PASS' || !dkimDomain || dkimDomain === fromDomain)) {
+    verdict = 'LEGITIMATE';
+    verdictDescription = `Legitimate verified sender: Successfully authenticated via domain SPF and cryptographic records.`;
+  } else {
+    verdict = 'PARTIAL';
+    verdictDescription = 'Partial authentication records detected.';
+  }
+
+  return {
+    isHeaderPresent: true,
+    from: { name: fromName, email: fromEmail, domain: fromDomain },
+    returnPath: { email: returnPath, domain: returnDomain },
+    replyTo: { email: replyTo, domain: replyDomain },
+    subject,
+    clientIp,
+    spf: { status: spfStatus, details: spfDetails },
+    dkim: { status: dkimStatus, domain: dkimDomain, details: dkimDetails },
+    dmarc: { status: dmarcStatus, policy: dmarcPolicy, details: dmarcDetails },
+    verdict,
+    verdictDescription
+  };
+}
+
 export function analyzeEmail(content) {
   const text = content ? content.trim() : '';
 
@@ -95,7 +275,8 @@ export function analyzeEmail(content) {
       badgeBg: 'bg-border-subtle',
       summary: 'Paste email text, subject lines, or headers to analyze for phishing markers.',
       findings: [],
-      categories: []
+      categories: [],
+      headers: null
     };
   }
 
@@ -103,6 +284,34 @@ export function analyzeEmail(content) {
   const categories = [];
   let score = 0;
   const lowerText = text.toLowerCase();
+
+  // Check 0: Email Headers & Authentication Audit (SPF, DKIM, DMARC)
+  const headerData = parseEmailHeaders(text);
+  if (headerData && headerData.isHeaderPresent) {
+    if (headerData.verdict === 'SPOOFED') {
+      score += 65;
+      categories.push('Forged Headers (Spoofed Sender)');
+      findings.unshift({
+        title: 'Authentication Failed: Spoofed Sender Detected',
+        type: 'danger',
+        desc: headerData.verdictDescription || 'SPF, DKIM, or DMARC authentication failed. The sending mail server is not authorized to send on behalf of this domain.'
+      });
+    } else if (headerData.verdict === 'SUSPICIOUS') {
+      score += 35;
+      categories.push('Header Domain Discrepancy');
+      findings.unshift({
+        title: 'Sender Return-Path Discrepancy',
+        type: 'warning',
+        desc: headerData.verdictDescription
+      });
+    } else if (headerData.verdict === 'LEGITIMATE') {
+      findings.push({
+        title: 'Cryptographic Header Authentication Verified',
+        type: 'success',
+        desc: `SPF (IP Authorized) and DKIM (Signature Valid) confirmed for @${headerData.from.domain || 'sender domain'}.`
+      });
+    }
+  }
 
   // Check 1: Card & PIN Harvesting (Highest Critical Danger)
   const hasCard = CARD_PIN_REGEXES[0].test(text);
@@ -366,7 +575,8 @@ export function analyzeEmail(content) {
     badgeBg,
     summary,
     findings,
-    categories: [...new Set(categories)]
+    categories: [...new Set(categories)],
+    headers: headerData
   };
 }
 

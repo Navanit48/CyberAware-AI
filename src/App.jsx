@@ -6,6 +6,7 @@ import AssistantView from './views/AssistantView';
 import PasswordView from './views/PasswordView';
 import UrlView from './views/UrlView';
 import EmailView from './views/EmailView';
+import QuizView from './views/QuizView';
 import LearnView from './views/LearnView';
 import SettingsView from './views/SettingsView';
 import { askCyberAwareAI } from './lib/gemini';
@@ -127,6 +128,10 @@ export default function App() {
           )}
 
           {activeTab === 'email' && <EmailView />}
+
+          {activeTab === 'quiz' && (
+            <QuizView onNavigateToSection={(tab) => setActiveTab(tab)} />
+          )}
 
           {activeTab === 'learn' && (
             <LearnView onAskQuestion={(q) => handleSendMessage(q)} />

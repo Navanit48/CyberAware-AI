@@ -7,6 +7,7 @@ import {
   Globe, 
   Mail, 
   BookOpen, 
+  BrainCircuit,
   Settings, 
   Shield, 
   Users,
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { id: 'password', label: 'Password Strength', icon: Lock },
   { id: 'url', label: 'URL Safety Checker', icon: Globe },
   { id: 'email', label: 'Email Analyzer', icon: Mail },
+  { id: 'quiz', label: 'Cyber Quiz', icon: BrainCircuit },
   { id: 'learn', label: 'Security Learn', icon: BookOpen },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
