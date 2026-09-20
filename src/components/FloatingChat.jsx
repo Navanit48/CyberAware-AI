@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Paperclip, Mic, Send, Sparkles } from 'lucide-react';
+import { Send, Sparkles } from 'lucide-react';
 
 const SUGGESTIONS = [
   "What is phishing?",
@@ -62,16 +62,6 @@ export default function FloatingChat({ onSendMessage, isAsking, showSuggestions 
         onSubmit={handleSubmit}
         className="w-full frosted-glass-card rounded-full p-2 pl-5 flex items-center gap-3 border border-border-subtle hover:border-border-glow shadow-glass-smooth focus-within:border-emerald-accent/50 focus-within:ring-2 focus-within:ring-emerald-accent/20 transition-all"
       >
-        {/* Attachment Button */}
-        <button
-          type="button"
-          title="Attach file"
-          aria-label="Attach file"
-          className="p-2 text-subtext-muted hover:text-subtext-primary transition-colors rounded-full hover:bg-surface-hover shrink-0"
-        >
-          <Paperclip className="w-4 h-4" />
-        </button>
-
         {/* Input Textarea / Field */}
         <input
           type="text"
@@ -87,16 +77,6 @@ export default function FloatingChat({ onSendMessage, isAsking, showSuggestions 
         <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface-hover border border-border-subtle text-[10px] text-subtext-muted font-mono">
           <span>⌘ ↵ to send</span>
         </div>
-
-        {/* Voice Input Button */}
-        <button
-          type="button"
-          title="Voice input"
-          aria-label="Voice input"
-          className="p-2 text-subtext-muted hover:text-subtext-primary transition-colors rounded-full hover:bg-surface-hover shrink-0"
-        >
-          <Mic className="w-4 h-4" />
-        </button>
 
         {/* Send Button */}
         <motion.button
