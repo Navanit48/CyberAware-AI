@@ -64,7 +64,7 @@ export default function UrlView({ onNavigateToEmail }) {
   const effectiveScore = isDbCompromised 
     ? 100 
     : (aiVerdict 
-        ? Math.max(heuristic.score, aiVerdict.score) 
+        ? aiVerdict.score 
         : (liveIntel?.threatScore ? Math.max(heuristic.score, liveIntel.threatScore) : heuristic.score));
 
   const effectiveRiskLevel = isDbCompromised 
