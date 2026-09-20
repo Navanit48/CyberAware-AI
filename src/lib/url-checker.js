@@ -403,6 +403,17 @@ export function generateLocalUrlReport(inputUrl, heuristic, liveIntel = null) {
   const isMediumRisk = heuristic.score >= 20 && heuristic.score < 50;
 
   const threatBadge = isHighRisk ? 'HIGH RISK / COMPROMISED' : isMediumRisk ? 'MEDIUM RISK / CAUTION' : 'LOW RISK / GENERALLY SAFE';
+  const safetyStatus = isHighRisk 
+    ? 'DANGEROUS' 
+    : isMediumRisk 
+    ? 'CAUTION (POTENTIAL BRAND MISMATCH / UNVERIFIED HOST)' 
+    : 'SAFE TO BROWSE';
+
+  const plainSummary = isHighRisk
+    ? 'This website exhibits critical risk indicators such as known threat database listings, brand impersonation, or dangerous parameters. Do not enter credentials.'
+    : isMediumRisk
+    ? 'This domain displays suspicious characteristics such as non-standard domain structure, unusual TLD, or potential squatting. Verify the official site before interacting.'
+    : 'This domain exhibits standard web architecture, active DNS resolution, and no known malicious indicators.';
 
   let redFlags = heuristic.signals
     .filter(s => s.type === 'danger' || s.type === 'warning')
@@ -431,13 +442,15 @@ export function generateLocalUrlReport(inputUrl, heuristic, liveIntel = null) {
     ? `Matched active entry in Global Threat Database (\`${liveIntel.matchedEntry}\`)` 
     : 'Clean in Global Threat Database';
 
-  return `### Security Assessment & Network Intelligence
+  return `### Overall Safety Verdict
 
-**Overall Verdict:** ${threatBadge} (Threat Score: ${heuristic.score}/100)
+**Is this website safe?** ${safetyStatus}  
+**AI Threat Score:** ${heuristic.score} / 100 (${threatBadge})  
+**Executive Summary:** ${plainSummary}
 
 ---
 
-### Security Verification Indicators
+### 1. Security Verification Indicators
 - **Threat Database Status:** ${blacklistStatus}
 - **Cloudflare Security DNS:** ${cfStatus}
 - **Live DNS & Server Origin:** ${dnsStatus}
@@ -445,7 +458,7 @@ export function generateLocalUrlReport(inputUrl, heuristic, liveIntel = null) {
 
 ---
 
-### Domain Breakdown & Anatomy
+### 2. Domain Breakdown & Anatomy
 - **Target Host:** \`${heuristic.hostname || inputUrl}\`
 - **Root Domain:** \`${heuristic.anatomy?.rootDomain || 'N/A'}\`
 - **Subdomain Depth:** \`${heuristic.anatomy?.subdomains || 'None'}\`
@@ -453,16 +466,67 @@ export function generateLocalUrlReport(inputUrl, heuristic, liveIntel = null) {
 
 ---
 
-### Identified Risk Indicators & Heuristics
+### 3. Identified Risk Indicators & Heuristics
 ${redFlags}
 
 ---
 
-### Actionable Defense Recommendations
+### 4. Actionable Defense Recommendations
 1. ${recommendation}
-2. **Double-check the address bar:** Pay close attention to subtle spelling variations or unexpected domain endings.
+2. **Double-check the address bar:** Pay close attention to subtle spelling variations or unexpected domain endings (e.g. \`.org\` instead of \`.com\`).
 3. **Use Multi-Factor Authentication (MFA):** Keeps your accounts secure even if credentials are accidentally entered on a spoofed site.
 4. **When in doubt:** Open a new browser tab and navigate to the official website directly rather than following links.`;
+}
+
+/**
+ * Extracts the AI evaluated threat score and safety verdict from the deep report
+ */
+export function extractAiUrlVerdict(aiText) {
+  if (!aiText) return null;
+
+  // Extract Threat Score (e.g. "AI Threat Score: 45" or "45 / 100")
+  const scoreMatch = aiText.match(/(?:AI Threat Score|Threat Score|Evaluated Threat Score|Calculated Threat Score)\s*:\s*(\d{1,3})/i);
+
+  // Extract Executive Summary
+  const summaryMatch = aiText.match(/(?:Executive Summary|Safety Summary|Bottom Line|Summary|Verdict Summary)\s*:\s*([^\n\r]+)/i);
+
+  // Extract Verdict
+  const verdictMatch = aiText.match(/(?:Overall Safety Verdict|Is this website safe\?|Overall Verdict|Threat Classification|Risk Rating)\s*:\s*([^\n\r.]+)/i);
+
+  let score = null;
+  if (scoreMatch) {
+    score = Math.min(Math.max(parseInt(scoreMatch[1], 10), 0), 100);
+  } else if (verdictMatch) {
+    const v = verdictMatch[1].toLowerCase();
+    if (v.includes('danger') || v.includes('critical') || v.includes('high') || v.includes('phish') || v.includes('malicious')) score = 85;
+    else if (v.includes('caution') || v.includes('suspicious') || v.includes('moderate') || v.includes('mismatch') || v.includes('squat')) score = 45;
+    else if (v.includes('safe') || v.includes('clean') || v.includes('low')) score = 0;
+  }
+
+  if (score !== null) {
+    let riskLevel = 'LOW RISK';
+    let badgeColor = 'text-emerald-accent';
+    let badgeBg = 'bg-emerald-500/10 border-emerald-500/30';
+    let summary = 'AI Security Intelligence evaluated website as safe / low risk.';
+
+    if (score >= 50) {
+      riskLevel = 'HIGH RISK';
+      badgeColor = 'text-red-400';
+      badgeBg = 'bg-red-500/10 border-red-500/30';
+      summary = summaryMatch ? summaryMatch[1].trim() : 'AI Intelligence detected high-risk brand impersonation or malicious indicators.';
+    } else if (score >= 20) {
+      riskLevel = 'MEDIUM RISK';
+      badgeColor = 'text-amber-400';
+      badgeBg = 'bg-amber-500/10 border-amber-500/30';
+      summary = summaryMatch ? summaryMatch[1].trim() : 'AI Intelligence identified potential brand mismatch, TLD confusion, or domain squatting.';
+    } else {
+      if (summaryMatch) summary = summaryMatch[1].trim();
+    }
+
+    return { score, riskLevel, badgeColor, badgeBg, summary };
+  }
+
+  return null;
 }
 
 /**

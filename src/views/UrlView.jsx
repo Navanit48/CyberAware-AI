@@ -16,7 +16,13 @@ import {
   Database,
   Radio
 } from 'lucide-react';
-import { analyzeUrl, generateLocalUrlReport, checkThreatIntelligence, scourInternetThreats } from '../lib/url-checker';
+import { 
+  analyzeUrl, 
+  generateLocalUrlReport, 
+  extractAiUrlVerdict,
+  checkThreatIntelligence, 
+  scourInternetThreats 
+} from '../lib/url-checker';
 import { askCyberAwareAI } from '../lib/gemini';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
@@ -29,6 +35,7 @@ export default function UrlView({ onNavigateToEmail }) {
   const [liveIntel, setLiveIntel] = useState(null);
 
   const heuristic = analyzeUrl(urlInput);
+  const aiVerdict = extractAiUrlVerdict(deepAnalysis);
 
   // Live Threat Intelligence Database Lookup
   useEffect(() => {
@@ -53,8 +60,28 @@ export default function UrlView({ onNavigateToEmail }) {
   }, [urlInput]);
 
   const isDbCompromised = threatIntel.found || (liveIntel && (liveIntel.localDbMatch || liveIntel.cloudflareBlocked));
-  const effectiveScore = isDbCompromised ? 100 : (liveIntel?.threatScore ? Math.max(heuristic.score, liveIntel.threatScore) : heuristic.score);
-  const effectiveRiskLevel = isDbCompromised ? 'CRITICAL COMPROMISED' : heuristic.riskLevel;
+  
+  const effectiveScore = isDbCompromised 
+    ? 100 
+    : (aiVerdict 
+        ? Math.max(heuristic.score, aiVerdict.score) 
+        : (liveIntel?.threatScore ? Math.max(heuristic.score, liveIntel.threatScore) : heuristic.score));
+
+  const effectiveRiskLevel = isDbCompromised 
+    ? 'CRITICAL COMPROMISED' 
+    : (aiVerdict ? aiVerdict.riskLevel : heuristic.riskLevel);
+
+  const effectiveSummary = isDbCompromised
+    ? `CRITICAL THREAT: Verified match in Global Threat Intelligence Database (${(threatIntel.databaseSize || 290676).toLocaleString()} indexed domains).`
+    : (aiVerdict ? aiVerdict.summary : heuristic.summary);
+
+  const effectiveBadgeBg = isDbCompromised
+    ? 'bg-red-500/10 border-red-500/30'
+    : (aiVerdict ? aiVerdict.badgeBg : heuristic.badgeBg);
+
+  const effectiveBadgeColor = isDbCompromised
+    ? 'text-red-400'
+    : (aiVerdict ? aiVerdict.badgeColor : heuristic.badgeColor);
 
   const handleDeepScan = async () => {
     if (!urlInput.trim() || isScanning) return;
@@ -76,22 +103,45 @@ export default function UrlView({ onNavigateToEmail }) {
     const currentScore = currentCompromised ? 100 : (scourData?.threatScore ? Math.max(heuristic.score, scourData.threatScore) : effectiveScore);
     const currentRisk = currentCompromised ? 'CRITICAL COMPROMISED' : heuristic.riskLevel;
 
-    const prompt = `Perform a comprehensive cybersecurity threat inspection on this domain/URL: "${urlInput.trim()}".
-Security Assessment Findings:
-- Calculated Threat Score: ${currentScore}/100 (${currentRisk})
-- Threat Database Blacklist Match: ${currentCompromised ? `YES (Found in active database of ${threatIntel.databaseSize?.toLocaleString()} compromised domains)` : 'No match in local blacklist'}
+    const prompt = `Perform a comprehensive cybersecurity domain and threat intelligence inspection on this target domain/URL: "${urlInput.trim()}".
+
+Technical Scan Findings:
+- Domain: ${heuristic.hostname || urlInput}
+- Root Domain: ${heuristic.anatomy?.rootDomain || 'N/A'} (TLD: ${heuristic.anatomy?.tld || 'N/A'})
+- Subdomains: ${heuristic.anatomy?.subdomains || '(none)'}
+- Initial Calculated Threat Score: ${currentScore}/100 (${currentRisk})
+- Threat Database Blacklist Match: ${currentCompromised ? `MATCHED / COMPROMISED (Found in active database of ${threatIntel.databaseSize?.toLocaleString()} malicious domains)` : 'Clean in local blacklist'}
 - Cloudflare Security Filter: ${scourData?.cloudflareBlocked ? 'BLOCKED / MALICIOUS' : 'CLEAN / RESOLVED'}
-- Live DNS Origin: ${scourData?.googleResolved ? `Active (${scourData.resolvedIps?.join(', ')})` : 'Unresolved / Dormant'}
-- Root Domain: ${heuristic.anatomy?.rootDomain || 'N/A'}
-- Subdomains: ${heuristic.anatomy?.subdomains || 'N/A'}
+- Live DNS Origin: ${scourData?.googleResolved ? `Active (${scourData.resolvedIps?.join(', ') || 'Resolvable'})` : 'Unresolved / Dormant'}
+- Mail Server (MX): ${scourData?.hasMxRecords ? 'Active MX Records' : 'None / Potential Disposable'}
 - Triggered Signals: ${heuristic.signals?.map(s => s.title).join(', ') || 'None'}
 
-Please provide a detailed, structured security intelligence breakdown:
-1. **Threat Assessment & Risk Level**
-2. **Live DNS & Security Filter Status**
-3. **Brand Spoofing & Phishing Analysis**
-4. **Transport Security & Domain Architecture**
-5. **Actionable Recommendations for the User**`;
+CRITICAL INSTRUCTIONS FOR ASSESSMENT:
+1. Brand Spoofing, TLD Mismatch & Squatting Analysis: Evaluate if this domain uses an alternate or non-canonical TLD (such as .org, .net, .xyz, or hyphens) for an established commercial or consumer brand/service whose primary official domain is different (e.g. using .org or .net when the genuine platform operates on .com, or lookalike typosquats).
+2. Threat Score Calibration: If the domain is an alternate TLD, unverified brand copy, or potential domain squatting/traffic capture site, DO NOT assign 0. Assign an evaluated threat score reflecting the risk (e.g. 35–55 for alternate TLD/domain squatting/brand confusion, 60–100 for active phishing/malware/deceptive credentials).
+3. Structure: Provide the OVERALL SAFETY VERDICT and EXECUTIVE SUMMARY FIRST so the user immediately knows if it is safe to browse or if caution is required, followed by technical breakdowns.
+
+Please structure your report strictly in the following format:
+
+### Overall Safety Verdict
+
+**Is this website safe?** [SAFE / CAUTION (POTENTIAL BRAND MISMATCH OR SQUATTING) / DANGEROUS]  
+**AI Threat Score:** [0-100] (0-15: Verified genuine & safe, 25-55: Alternate TLD/Potential Squatting/Brand Confusion, 60-100: Malicious/Phishing)  
+**Executive Summary:** [Clear 1-2 sentence plain-English summary answering directly whether the user should visit, exercise caution, or avoid]
+
+---
+
+### 1. Brand Spoofing & Domain Authenticity
+- Analysis of whether the domain represents the genuine canonical brand or an alternate TLD/typosquatting risk.
+
+### 2. Live DNS & Network Security Status
+- DNS resolution, server IP origin, Cloudflare security filters, and mail host status.
+
+### 3. Transport Security & Domain Architecture
+- Encryption protocol (HTTPS/TLS), subdomain hierarchy, and target port.
+
+### 4. Actionable Defense Recommendations
+- Clear recommendations on verifying official URLs, using MFA, and safe browsing habits.`;
 
     try {
       const res = await askCyberAwareAI(prompt);
@@ -274,7 +324,7 @@ Please provide a detailed, structured security intelligence breakdown:
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2.5">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${isDbCompromised ? 'bg-red-500/10 border-red-500/30 text-red-400' : heuristic.badgeBg} ${isDbCompromised ? 'text-red-400' : heuristic.badgeColor}`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${effectiveBadgeBg} ${effectiveBadgeColor}`}>
                     {effectiveRiskLevel}
                   </span>
                   {heuristic.hostname && (
@@ -282,9 +332,7 @@ Please provide a detailed, structured security intelligence breakdown:
                   )}
                 </div>
                 <p className="text-sm font-medium text-subtext-primary">
-                  {isDbCompromised 
-                    ? `CRITICAL THREAT: Verified match in Global Threat Intelligence Database (${(threatIntel.databaseSize || 290676).toLocaleString()} indexed domains).`
-                    : heuristic.summary}
+                  {effectiveSummary}
                 </p>
               </div>
 
