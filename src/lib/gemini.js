@@ -14,15 +14,16 @@ Guidelines:
 5. Highlight critical risk warnings clearly using bold text.`;
 
 async function fetchWithRetry(url, options, retries = 4, backoff = 2000) {
+  const retryableStatuses = [429, 503];
   for (let i = 0; i < retries; i++) {
     const res = await fetch(url, options);
-    // If it's successful, or if it's an error OTHER than 429, return immediately
-    if (res.ok || res.status !== 429) {
+    // If it's successful, or if it's an error OTHER than 429/503, return immediately
+    if (res.ok || !retryableStatuses.includes(res.status)) {
       return res;
     }
-    // If it's a 429, wait and retry
+    // If it's a retryable error, wait and retry
     if (i < retries - 1) {
-      console.warn(`[Rate Limit] 429 Too Many Requests. Retrying in ${backoff}ms...`);
+      console.warn(`[API Error] ${res.status}. Retrying in ${backoff}ms...`);
       await new Promise(resolve => setTimeout(resolve, backoff));
       backoff *= 1.5; // Exponential backoff
     } else {
