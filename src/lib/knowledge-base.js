@@ -17,7 +17,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   password: {
     title: "Password Hygiene & Entropy Standards",
     summary: "Strong passwords are the first line of defense against brute-force and dictionary attacks.",
-    link: "https://www.ibm.com/topics/password-security",
+    link: "https://www.ibm.com/think/x-force/how-to-keep-secrets-safe-password-primer",
     keyTakeaways: [
       "Use passphrases of at least 15–16 characters (e.g., `purple-dragon-flying-coffee-92`).",
       "Never reuse passwords across multiple services.",
@@ -30,7 +30,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   mfa: {
     title: "Multi-Factor Authentication (MFA & 2FA)",
     summary: "MFA requires two or more verification factors to gain access to a resource, drastically reducing account takeover risks.",
-    link: "https://www.ibm.com/topics/multifactor-authentication",
+    link: "https://www.ibm.com/think/topics/multi-factor-authentication",
     keyTakeaways: [
       "Prefer Hardware Security Keys (YubiKey) or Authenticator Apps (TOTP) over SMS OTP.",
       "SMS codes can be intercepted via SIM-swapping attacks.",
@@ -56,7 +56,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   wifi: {
     title: "Public Wi-Fi & Network Security",
     summary: "Unencrypted public Wi-Fi networks allow attackers to perform Man-in-the-Middle (MitM) eavesdropping.",
-    link: "https://www.cisa.gov/news-events/news/understanding-risks-virtual-private-networks-vpns",
+    link: "https://www.ibm.com/think/topics/network-security",
     keyTakeaways: [
       "Use a reputable VPN on public networks to encrypt your traffic.",
       "Verify websites use HTTPS (look for standard TLS protocols).",
