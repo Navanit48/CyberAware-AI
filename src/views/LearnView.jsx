@@ -94,13 +94,15 @@ export default function LearnView({ onAskQuestion }) {
           </div>
 
           <div className="pt-4 border-t border-border-subtle flex justify-end">
-            <button
-              onClick={() => onAskQuestion && onAskQuestion(`Explain ${currentModule.label} in detail and how to protect myself.`)}
+            <a
+              href={currentModule.data.link || "https://www.ibm.com/topics/cybersecurity"}
+              target="_blank"
+              rel="noopener noreferrer"
               className="px-5 py-2.5 rounded-xl bg-emerald-accent text-slate-950 font-semibold text-xs flex items-center gap-1.5 shadow-emerald-pill hover:bg-emerald-hover transition-all cursor-pointer"
             >
-              <span>Ask AI About This Topic</span>
+              <span>Learn More on IBM Security</span>
               <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            </a>
           </div>
         </motion.div>
       </AnimatePresence>

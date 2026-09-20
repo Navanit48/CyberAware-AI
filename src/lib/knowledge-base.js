@@ -4,6 +4,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   phishing: {
     title: "Understanding & Preventing Phishing Attacks",
     summary: "Phishing is a social engineering attack where bad actors impersonate trusted organizations via email, SMS, or websites to steal credentials or financial data.",
+    link: "https://www.ibm.com/topics/phishing",
     keyTakeaways: [
       "Check sender addresses carefully (e.g. `support@sec-bank.com` vs `support@bank.com`).",
       "Look for urgency cues: 'Your account will be suspended in 24 hours!'",
@@ -16,6 +17,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   password: {
     title: "Password Hygiene & Entropy Standards",
     summary: "Strong passwords are the first line of defense against brute-force and dictionary attacks.",
+    link: "https://www.ibm.com/topics/password-security",
     keyTakeaways: [
       "Use passphrases of at least 15–16 characters (e.g., `purple-dragon-flying-coffee-92`).",
       "Never reuse passwords across multiple services.",
@@ -28,6 +30,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   mfa: {
     title: "Multi-Factor Authentication (MFA & 2FA)",
     summary: "MFA requires two or more verification factors to gain access to a resource, drastically reducing account takeover risks.",
+    link: "https://www.ibm.com/topics/multifactor-authentication",
     keyTakeaways: [
       "Prefer Hardware Security Keys (YubiKey) or Authenticator Apps (TOTP) over SMS OTP.",
       "SMS codes can be intercepted via SIM-swapping attacks.",
@@ -40,6 +43,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   ransomware: {
     title: "Ransomware Defense & Mitigation",
     summary: "Ransomware encrypts victim files and demands payment for the decryption key.",
+    link: "https://www.ibm.com/topics/ransomware",
     keyTakeaways: [
       "Maintain offline, immutable 3-2-1 backups (3 copies, 2 media types, 1 offsite/air-gapped).",
       "Keep operating systems and software patched against known exploits.",
@@ -52,6 +56,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   wifi: {
     title: "Public Wi-Fi & Network Security",
     summary: "Unencrypted public Wi-Fi networks allow attackers to perform Man-in-the-Middle (MitM) eavesdropping.",
+    link: "https://www.cisa.gov/news-events/news/understanding-risks-virtual-private-networks-vpns",
     keyTakeaways: [
       "Use a reputable VPN on public networks to encrypt your traffic.",
       "Verify websites use HTTPS (look for standard TLS protocols).",
@@ -64,6 +69,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   social_engineering: {
     title: "Social Engineering Tactics & Awareness",
     summary: "Social engineering manipulates human psychology rather than exploiting software vulnerabilities.",
+    link: "https://www.ibm.com/topics/social-engineering",
     keyTakeaways: [
       "Be skeptical of unsolicited calls, texts, or emails asking for sensitive information.",
       "Verify unexpected requests through an independent communication channel.",
@@ -76,6 +82,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   malware: {
     title: "Malware Detection & Endpoint Protection",
     summary: "Malware includes viruses, trojans, spyware, keyloggers, and adware designed to compromise devices.",
+    link: "https://www.ibm.com/topics/malware",
     keyTakeaways: [
       "Use modern EDR / Antivirus software and keep definitions updated.",
       "Only download files and applications from verified official sources.",
@@ -88,6 +95,7 @@ export const LOCAL_KNOWLEDGE_BASE = {
   vpn: {
     title: "Virtual Private Networks (VPN) Explained",
     summary: "A VPN routes your internet traffic through an encrypted tunnel to a remote server, masking your IP address.",
+    link: "https://www.ibm.com/topics/vpn",
     keyTakeaways: [
       "VPNs protect against ISP tracking and public Wi-Fi snooping.",
       "A VPN does not make you completely anonymous online or immune to malware.",
