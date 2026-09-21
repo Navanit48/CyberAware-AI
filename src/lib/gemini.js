@@ -4,11 +4,10 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // Array of models to try in order of preference. If one hits a rate limit, it falls back to the next.
 const FALLBACK_MODELS = [
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
-  'gemini-flash-latest',
-  'gemini-3.5-flash-lite',
-  'gemini-pro-latest'
+  'gemini-1.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-pro',
+  'gemini-2.5-flash'
 ];
 
 const SYSTEM_INSTRUCTION = `You are CyberAware AI, an elite cybersecurity intelligence assistant built with Apple and Linear design philosophies.
