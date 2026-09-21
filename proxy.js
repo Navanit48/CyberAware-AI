@@ -260,9 +260,10 @@ function proxyPost(targetUrl, reqBody, apiKey, res, redirectsLeft = 3) {
   upstream.end();
 }
 
-/* ── Serve a static file ─────────────────────────────────────────────── */
+/* ── Serve a static file (with SPA index.html fallback) ──────────────── */
 function serveStatic(reqPath, res) {
-  const safePath = reqPath === '/' ? '/index.html' : reqPath;
+  const cleanPath = reqPath.split('?')[0];
+  const safePath = cleanPath === '/' ? '/index.html' : cleanPath;
   const filePath = path.join(STATIC, safePath);
 
   // Prevent directory traversal
@@ -270,16 +271,33 @@ function serveStatic(reqPath, res) {
     res.writeHead(403); res.end('Forbidden'); return;
   }
 
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Not found: ' + safePath);
+  fs.stat(filePath, (err, stats) => {
+    if (err || !stats.isFile()) {
+      // SPA Fallback: If not a direct asset file, serve dist/index.html
+      const indexPath = path.join(STATIC, 'index.html');
+      fs.readFile(indexPath, (indexErr, indexData) => {
+        if (indexErr) {
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('CyberAware AI — Build not found. Run npm run build.');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(indexData);
+      });
       return;
     }
-    const ext  = path.extname(filePath);
-    const mime = MIME[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': mime });
-    res.end(data);
+
+    fs.readFile(filePath, (readErr, data) => {
+      if (readErr) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Internal server error');
+        return;
+      }
+      const ext  = path.extname(filePath);
+      const mime = MIME[ext] || 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': mime });
+      res.end(data);
+    });
   });
 }
 

@@ -2,17 +2,15 @@
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Array of models to try in order of preference. If one hits a rate limit, it falls back to the next.
+// Array of models to try in order of preference. If one hits a rate limit or high demand (503), it falls back to the next.
 const FALLBACK_MODELS = [
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
-  'gemini-2.5-flash',
-  'gemini-1.5-pro',
   'gemini-flash-latest',
-  'gemini-3.1-flash-lite',
-  'gemini-3.7-flash',
-  'gemini-3.6-flash',
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
+  'gemini-2.5-flash',
   'gemini-3.5-flash',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
   'gemini-pro-latest'
 ];
 
@@ -25,27 +23,28 @@ Guidelines:
 4. If asked about dangerous hacking attacks against innocent targets, focus on defensive countermeasures and ethical protection.
 5. Highlight critical risk warnings clearly using bold text.`;
 
-async function fetchWithRetry(url, options, retries = 2, backoff = 1000) {
-  // Reduced retries and backoff to fail faster and switch models quicker
+async function fetchWithRetry(url, options, retries = 1, backoff = 800) {
   const retryableStatuses = [429];
   for (let i = 0; i < retries; i++) {
     const res = await fetch(url, options);
-    // If it's successful, or if it's an error OTHER than 429/503, return immediately
     if (res.ok || !retryableStatuses.includes(res.status)) {
       return res;
     }
-    // If it's a retryable error, wait and retry
     if (i < retries - 1) {
       console.warn(`[API Error] ${res.status}. Retrying in ${backoff}ms...`);
       await new Promise(resolve => setTimeout(resolve, backoff));
-      backoff *= 1.5; // Exponential backoff
+      backoff *= 1.5;
     } else {
-      return res; // Return the 429/503 if we ran out of retries
+      return res;
     }
   }
 }
 
 export async function askCyberAwareAI(question, modelOverride = null) {
+  if (!GEMINI_API_KEY) {
+    return { success: false, error: 'No API key configured.' };
+  }
+
   const modelsToTry = modelOverride ? [modelOverride] : FALLBACK_MODELS;
 
   const payload = {
@@ -86,9 +85,8 @@ export async function askCyberAwareAI(question, modelOverride = null) {
         if (text) return { success: true, text, source: 'gemini-proxy', modelUsed: model };
       }
 
-      // If the proxy fails but NOT because it's offline (500), it's a real API failure (e.g. 429 limit).
-      // In this case, skip the direct fallback and move to the NEXT model.
-      if (proxyRes && proxyRes.status !== 500 && proxyRes.status !== 502 && proxyRes.status !== 504) {
+      // If proxy responded with an API error (404, 429, 503, etc.), proceed to next model immediately
+      if (proxyRes && (proxyRes.status === 404 || proxyRes.status === 429 || proxyRes.status === 503 || proxyRes.status === 400)) {
         console.warn(`[AI] Proxy returned ${proxyRes.status} for ${model}. Switching to next model...`);
         continue;
       }
