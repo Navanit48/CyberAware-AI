@@ -6,8 +6,14 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const FALLBACK_MODELS = [
   'gemini-1.5-flash',
   'gemini-2.0-flash',
+  'gemini-2.5-flash',
   'gemini-1.5-pro',
-  'gemini-2.5-flash'
+  'gemini-flash-latest',
+  'gemini-3.1-flash-lite',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-pro-latest'
 ];
 
 const SYSTEM_INSTRUCTION = `You are CyberAware AI, an elite cybersecurity intelligence assistant built with Apple and Linear design philosophies.
@@ -21,7 +27,7 @@ Guidelines:
 
 async function fetchWithRetry(url, options, retries = 2, backoff = 1000) {
   // Reduced retries and backoff to fail faster and switch models quicker
-  const retryableStatuses = [429, 503];
+  const retryableStatuses = [429];
   for (let i = 0; i < retries; i++) {
     const res = await fetch(url, options);
     // If it's successful, or if it's an error OTHER than 429/503, return immediately
@@ -79,12 +85,12 @@ export async function askCyberAwareAI(question, modelOverride = null) {
         const text = extractGeminiText(data);
         if (text) return { success: true, text, source: 'gemini-proxy', modelUsed: model };
       }
-      
+
       // If the proxy fails but NOT because it's offline (500), it's a real API failure (e.g. 429 limit).
       // In this case, skip the direct fallback and move to the NEXT model.
       if (proxyRes && proxyRes.status !== 500 && proxyRes.status !== 502 && proxyRes.status !== 504) {
         console.warn(`[AI] Proxy returned ${proxyRes.status} for ${model}. Switching to next model...`);
-        continue; 
+        continue;
       }
     } catch (err) {
       // Network error hitting the proxy, continue to direct fallback
@@ -103,7 +109,7 @@ export async function askCyberAwareAI(question, modelOverride = null) {
         const text = extractGeminiText(data);
         if (text) return { success: true, text, source: 'gemini-direct', modelUsed: model };
       } else {
-         console.warn(`[AI] Direct call returned ${directRes?.status} for ${model}. Switching to next model...`);
+        console.warn(`[AI] Direct call returned ${directRes?.status} for ${model}. Switching to next model...`);
       }
     } catch (err) {
       console.warn(`[AI] Direct API call failed for ${model}:`, err);
