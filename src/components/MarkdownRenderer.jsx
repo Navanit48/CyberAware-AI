@@ -30,7 +30,7 @@ export default function MarkdownRenderer({ content }) {
             </p>
           ),
           strong: ({ children }) => (
-            <strong className="font-bold text-subtext-primary bg-emerald-dim text-emerald-accent px-1.5 py-0.5 rounded border border-border-glow">
+            <strong className="font-bold text-emerald-accent bg-emerald-dim px-1.5 py-0.5 rounded border border-border-glow">
               {children}
             </strong>
           ),
